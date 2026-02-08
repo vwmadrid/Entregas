@@ -642,18 +642,34 @@
     }
 
     // --- AQUÍ ES DONDE ESTÁ EL ENLACE A CALENDLY ---
-    function renderStatusWidget() {
+function renderStatusWidget() {
         const box = document.getElementById('status-widget');
         if (!box) return;
+
+        // -----------------------------------------------------------
+        // 👇 TU ENLACE DE MICROSOFT BOOKINGS (YA CONFIGURADO) 👇
+        const linkBookings = 'https://outlook.office.com/book/EntregasVWMadrid@porscheholding.onmicrosoft.com/'; 
+        // -----------------------------------------------------------
+
         if (!currentUser.deliveryDate) {
+            // SI NO TIENE CITA: Mostramos el botón de reservar
             box.innerHTML = `
                 <div style="font-size:14px; margin-bottom:15px; opacity:0.9;">¿Aún no tienes fecha de entrega?</div>
-                <button class="btn-calendly" onclick="window.open('https://calendly.com/manuel-arjona-vwmadrid/reserva','_blank')">
-                    <i class="fas fa-calendar-check"></i> Reservar Cita Ahora
+                
+                <button class="btn-calendly" onclick="window.open('${linkBookings}','_blank')">
+                    <i class="fas fa-calendar-check"></i> RESERVAR CITA DE ENTREGA
                 </button>
-                <button class="btn-set-date" onclick="openDateModal()">Ya he reservado, activar cuenta atrás</button>
+                
+                <div style="margin-top:10px; font-size:10px; opacity:0.6;">
+                    Sistema automático de gestión de citas Volkswagen
+                </div>
+
+                <div style="margin-top:15px;">
+                    <button class="btn-set-date" onclick="openDateModal()">Ya tengo fecha confirmada</button>
+                </div>
             `;
         } else {
+            // SI YA TIENE CITA: Mostramos la cuenta atrás
             box.innerHTML = `
                 <div style="display:flex; justify-content:space-between; width:100%; padding:0 10px;">
                     <div style="font-size:9px; opacity:0.6; letter-spacing:1px;">TIEMPO RESTANTE</div>
@@ -769,3 +785,4 @@
 </script>
 </body>
 </html>
+
