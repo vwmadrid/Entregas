@@ -3,13 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Volkswagen Madrid Entregas</title>
-<link rel="manifest" href="manifest.json">
+    <title>Volkswagen Premium</title>
+    
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Mi VW">
     <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg">
+
+    <meta property="og:title" content="Tu Nuevo Volkswagen 🚗">
+    <meta property="og:description" content="Accede aquí para descubrir tu nuevo coche y gestionar la entrega.">
+    <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Volkswagen_logo_2019.svg/600px-Volkswagen_logo_2019.svg.png">
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -42,13 +48,12 @@
         .screen { display: none; flex-direction: column; padding: 25px; animation: fadeIn 0.5s ease; }
         .screen.active { display: flex; }
 
-        /* ANIMACIONES GENERALES */
+        /* ANIMACIONES */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes cameraFlash { 0% { opacity: 0; } 30% { opacity: 1; background: white; } 100% { opacity: 0; } }
 
-        /* --- LOGO BLANCO --- */
         .logo-white { filter: invert(1) brightness(100) drop-shadow(0 2px 5px rgba(0,0,0,0.8)); }
 
         /* SPLASH & TRANSICIÓN */
@@ -77,58 +82,44 @@
         /* DASHBOARD HEADER */
         .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-top: 10px; }
 
-        /* === NUEVO DISEÑO PREMIUM: SHOWROOM CON ESPEJO === */
+        /* REVEAL CONTAINER (Showroom Espejo) */
         .reveal-container {
-            position: relative; width: 100%; height: 350px; /* Más alto para el reflejo */
+            position: relative; width: 100%; height: 350px; 
             border-radius: 30px; overflow: hidden; margin-bottom: 40px;
-            /* Fondo de escenario profundo */
             background: radial-gradient(ellipse at center bottom, #1a2a40 0%, #000000 80%);
             border: 1px solid rgba(0, 176, 240, 0.2);
             box-shadow: 0 30px 60px rgba(0,0,0,1), inset 0 0 80px rgba(0,0,0,0.8);
-            display: flex; align-items: flex-end; /* Alineado abajo para el suelo */
-            justify-content: center;
-            perspective: 1000px;
-            padding-bottom: 40px; /* Espacio para el coche */
+            display: flex; align-items: flex-end; justify-content: center;
+            perspective: 1000px; padding-bottom: 40px;
         }
 
-        /* Luces Volumétricas Intensas */
         .moving-lights {
             position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-            background: 
-                conic-gradient(from 90deg at 50% 50%, rgba(0, 176, 240, 0.15) 0deg, transparent 60deg, transparent 300deg, rgba(255, 255, 255, 0.1) 360deg);
-            filter: blur(50px);
-            animation: rotateLights 20s infinite linear;
-            opacity: 0.8; z-index: 1;
+            background: conic-gradient(from 90deg at 50% 50%, rgba(0, 176, 240, 0.15) 0deg, transparent 60deg, transparent 300deg, rgba(255, 255, 255, 0.1) 360deg);
+            filter: blur(50px); animation: rotateLights 20s infinite linear; opacity: 0.8; z-index: 1;
         }
         @keyframes rotateLights { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* EL COCHE: Reflejo Real y Levitación Magnética */
         .car-photo { 
             width: 95%; height: auto; object-fit: contain; z-index: 3; 
-            /* ESTA ES LA CLAVE: Reflejo de espejo real debajo del coche */
             -webkit-box-reflect: below 2px linear-gradient(transparent 60%, rgba(0,0,0,0.5));
-            /* Animación de "flotación" pesada y brillo */
-            animation: intenseHover 5s ease-in-out infinite alternate;
-            transform-origin: center bottom;
+            animation: intenseHover 5s ease-in-out infinite alternate; transform-origin: center bottom;
         }
-
         @keyframes intenseHover {
             0% { transform: scale(0.9) translateY(10px); filter: brightness(0.95); }
             100% { transform: scale(0.93) translateY(0px); filter: brightness(1.1); }
         }
 
-        /* Estado Revelado: Zoom dramático */
         .reveal-container.revealed .car-photo { 
-            transform: scale(1.35) translateY(-20px); /* Se eleva y agranda */
-            filter: brightness(1.2) drop-shadow(0 50px 30px rgba(0,0,0,0.8)); /* Mucho más brillo y sombra lejana */
-            -webkit-box-reflect: below 10px linear-gradient(transparent 50%, rgba(0,0,0,0.7)); /* Reflejo más intenso */
-            transition: all 1.5s cubic-bezier(0.1, 0.9, 0.2, 1); /* Transición ultra suave */
+            transform: scale(1.35) translateY(-20px); 
+            filter: brightness(1.2) drop-shadow(0 50px 30px rgba(0,0,0,0.8));
+            -webkit-box-reflect: below 10px linear-gradient(transparent 50%, rgba(0,0,0,0.7));
+            transition: all 1.5s cubic-bezier(0.1, 0.9, 0.2, 1);
         }
         
         .flash-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 10; }
         .reveal-container.revealed .flash-overlay { animation: cameraFlash 1s ease-out; }
         
-        /* Cover (Tapa azul premium) */
         .blue-cover {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: radial-gradient(circle at center, #002b70 0%, #000918 100%);
@@ -139,7 +130,7 @@
         }
         .blue-cover img { opacity: 1; margin-bottom: 20px; filter: drop-shadow(0 0 20px rgba(0,176,240,0.5)); }
         .blue-cover h2 { font-size: 28px; letter-spacing: 3px; font-weight: 300; margin: 0; text-shadow: 0 5px 10px rgba(0,0,0,0.5); }
-        .blue-cover.open { transform: translateY(-120%); opacity: 0; } /* Ahora se levanta hacia ARRIBA */
+        .blue-cover.open { transform: translateY(-120%); opacity: 0; }
 
         /* STATUS BOX */
         .status-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); text-align: center; }
@@ -260,7 +251,8 @@
         <div class="status-box" id="status-widget"></div>
 
         <div class="reveal-container" id="car-stage">
-            <div class="moving-lights"></div> <div class="flash-overlay"></div>
+            <div class="moving-lights"></div> 
+            <div class="flash-overlay"></div>
             
             <div class="blue-cover" id="cover" onclick="reveal()">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="60" class="logo-white">
@@ -311,6 +303,16 @@
             <div class="tile" onclick="navTo('s-dealership')">
                 <i class="fas fa-map-marker-alt"></i>
                 <span>Concesionario</span>
+            </div>
+
+            <div class="tile wide" onclick="shareApp()" style="background: rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.2);">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <i class="fas fa-share-alt" style="color:var(--vw-light);"></i>
+                    <div>
+                        <div style="font-size:15px; font-weight:bold;">Compartir App</div>
+                        <div style="font-size:11px; opacity:0.7;">Envía esto a tu familia</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -403,6 +405,7 @@
         </div>
 
         <div style="font-size:14px; opacity:0.8; margin-bottom:10px;">Mira este vídeo para activarlo paso a paso:</div>
+        
         <div class="video-box" style="height: 200px; margin-bottom: 25px;">
             <video width="100%" height="100%" controls style="object-fit: cover; background: black;">
                 <source src="Conexion.mp4" type="video/mp4">
@@ -509,7 +512,7 @@
     const myPhone = "34660050228";
     let currentUser = null; 
 
-    // LISTA DE COCHES (NOMBRES CON MAYÚSCULA INICIAL + VÍDEO YOUTUBE)
+    // LISTA DE COCHES
     const cars = [
         { name: "Golf", file: "Golf.png", vid: "X5pVXMkeZbc" },
         { name: "Tiguan", file: "Tiguan.png", vid: "mq40yhpczSw" },
@@ -615,7 +618,7 @@
             const img = document.getElementById('real-car-img');
             if(img) img.src = "images/" + currentUser.car.file;
             
-            // Video del coche (AHORA USA YOUTUBE DEL ARRAY)
+            // Video del coche
             const vidPlayerFrame = document.getElementById('video-player-frame');
             const btnCarName = document.getElementById('btn-car-name');
             const vidTitle = document.getElementById('video-car-title');
@@ -638,6 +641,7 @@
         if(navigator.vibrate) navigator.vibrate(40);
     }
 
+    // --- AQUÍ ES DONDE ESTÁ EL ENLACE A CALENDLY ---
     function renderStatusWidget() {
         const box = document.getElementById('status-widget');
         if (!box) return;
@@ -735,6 +739,18 @@
         window.open(`https://wa.me/${myPhone}?text=${encodeURIComponent(msg)}`, '_blank');
     }
     
+    function shareApp() {
+        if (navigator.share) {
+            navigator.share({
+                title: 'Mi Nuevo Volkswagen',
+                text: '¡Mira! Ya está listo mi coche nuevo. Aquí tienes todos los detalles:',
+                url: window.location.href
+            });
+        } else {
+            alert("Copia este enlace: " + window.location.href);
+        }
+    }
+
     function imgError(image) {
         image.style.display = 'none'; 
         const debugMsg = document.createElement('div');
