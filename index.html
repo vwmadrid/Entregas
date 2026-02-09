@@ -2,8 +2,9 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="author" content="Manuel Arjona Carrera">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Volkswagen Premium</title>
+    <title>Volkswagen Premium | Manuel Arjona Carrera</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -26,7 +27,19 @@
             --border: rgba(255, 255, 255, 0.15);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        /* PROTECCIÓN ANTI-COPIA CSS */
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none; /* IE 10 y superior */
+            user-select: none; /* Estándar */
+        }
+
+        input, textarea {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+        }
 
         body {
             margin: 0; padding: 0; background: #000; color: white;
@@ -34,6 +47,7 @@
             min-height: 100vh;
             background: radial-gradient(circle at 100% 0%, #2a5298 0%, #000000 80%);
             background-attachment: fixed;
+            overflow-x: hidden;
         }
 
         .app-container {
@@ -65,7 +79,7 @@
 
         /* LOGIN */
         .login-wrapper { margin-top: 15%; display: flex; flex-direction: column; }
-        .logo-login { width: 60px; margin-bottom: 20px; align-self: center; animation: float 6s ease-in-out infinite; }
+        .logo-login { width: 60px; margin-bottom: 20px; align-self: center; }
         h1 { font-size: 36px; font-weight: 200; margin: 0; line-height: 1.1; text-align: center; }
         h1 span { font-weight: 700; color: var(--vw-light); }
         .subtitle { color: #8899a6; margin-bottom: 30px; font-size: 14px; margin-top: 10px; text-align: center; }
@@ -82,7 +96,7 @@
         /* DASHBOARD HEADER */
         .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-top: 10px; }
 
-        /* REVEAL CONTAINER (Showroom Espejo) */
+        /* REVEAL CONTAINER */
         .reveal-container {
             position: relative; width: 100%; height: 350px; 
             border-radius: 30px; overflow: hidden; margin-bottom: 40px;
@@ -149,20 +163,6 @@
         .tile i { font-size: 24px; color: var(--vw-light); }
         .tile span { font-size: 13px; font-weight: 600; }
 
-        /* VIDEO GUIA */
-        .video-section-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
-        .video-section-title i { color: var(--vw-light); }
-
-        /* DEALER */
-        .dealer-hero { position: relative; width: calc(100% + 50px); height: 280px; margin-left: -25px; margin-bottom: 30px; margin-top: -20px; }
-        .dealer-hero img { width: 100%; height: 100%; object-fit: cover; -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%); mask-image: linear-gradient(to bottom, black 70%, transparent 100%); }
-        .dealer-info-container { text-align: left; }
-        .dealer-title { font-size: 34px; font-weight: 800; margin: 0 0 30px 0; color: white; letter-spacing: -1px; }
-        .dealer-link { display: flex; align-items: center; gap: 20px; color: #ddd; text-decoration: none; padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 16px; transition: 0.3s; cursor: pointer; }
-        .dealer-link:active { color: var(--vw-light); background: rgba(255,255,255,0.02); }
-        .dealer-link i { color: var(--vw-light); font-size: 24px; width: 35px; text-align: center; }
-        .dealer-link.last { border-bottom: none; margin-bottom: 30px;}
-
         /* CHECKLIST */
         .checklist-item { display: flex; justify-content: space-between; align-items: center; padding: 18px; background: rgba(255,255,255,0.05); border-radius: 15px; margin-bottom: 10px; border: 1px solid var(--border); transition: 0.2s; }
         .checklist-item .left-content { display: flex; align-items: center; gap: 15px; flex: 1; cursor: pointer; }
@@ -171,13 +171,12 @@
         .checklist-item.checked span { text-decoration: line-through; opacity: 0.5; }
         .check-circle { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 12px; color: transparent; transition: 0.2s; flex-shrink: 0; }
         .link-action { background: rgba(255,255,255,0.1); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-left: 10px; cursor: pointer; }
-        .link-action:active { transform: scale(0.9); background: var(--vw-light); color:black;}
+
+        /* FOOTER / CREDIT */
+        .author-footer { text-align: center; padding: 20px; font-size: 10px; opacity: 0.4; letter-spacing: 1px; }
 
         /* SERVICIOS */
         .service-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 15px; cursor: pointer; display: flex; align-items: center; gap: 20px; transition: 0.2s; }
-        .service-card:active { transform: scale(0.98); background: rgba(255,255,255,0.1); }
-        .service-card.highlight { background: linear-gradient(135deg, #b00000, #5c0000); border: none; box-shadow: 0 5px 20px rgba(176,0,0,0.4); }
-        .service-icon { width: 50px; height: 50px; background: rgba(255,255,255,0.1); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
         .service-info h3 { margin: 0 0 5px 0; font-size: 18px; }
         .service-info p { margin: 0; font-size: 13px; opacity: 0.7; }
         
@@ -191,18 +190,15 @@
         /* OTROS */
         .pdf-viewer { width: 100%; height: 400px; background: white; border-radius: 15px; margin-bottom: 20px; border: none; }
         .request-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 50px;}
-        textarea { width: 100%; height: 80px; padding: 15px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; font-family: inherit; font-size: 14px; outline: none; resize: none; margin-bottom: 15px; }
+        textarea { width: 100%; height: 80px; padding: 15px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; outline: none; resize: none; margin-bottom: 15px; }
         .send-btn { background: #25D366; color: white; width: 100%; padding: 15px; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .video-box { width: 100%; height: 220px; background: black; border-radius: 20px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid var(--border); }
+        .video-box { width: 100%; height: 220px; background: black; border-radius: 20px; overflow: hidden; margin-bottom: 20px; border: 1px solid var(--border); }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .modal-box { background: #1a1a1a; padding: 25px; border-radius: 20px; width: 85%; border: 1px solid var(--vw-light); text-align: center; }
         .reset-btn { position: fixed; top: 10px; right: 10px; font-size: 10px; opacity: 0.3; cursor: pointer; z-index: 10000; background:black; padding:5px; border-radius:5px;}
-        .debug-msg { color: #ff4444; font-size: 12px; text-align: center; margin-top: 15px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 5px; }
     </style>
 </head>
-<body>
-
-<div class="app-container">
+<body oncontextmenu="return false;"> <div class="app-container">
     
     <div class="reset-btn" onclick="resetApp()"><i class="fas fa-trash"></i> Reset</div>
 
@@ -260,7 +256,7 @@
                 <div class="tap-hint" style="margin-top:20px; opacity:0.6; font-size:11px; letter-spacing:2px; font-weight:bold;">PULSA PARA DESCUBRIR</div>
             </div>
             
-            <img id="real-car-img" class="car-photo" src="" onerror="imgError(this)">
+            <img id="real-car-img" class="car-photo" src="">
         </div>
 
         <div class="bento">
@@ -304,26 +300,18 @@
                 <i class="fas fa-map-marker-alt"></i>
                 <span>Concesionario</span>
             </div>
-
-            <div class="tile wide" onclick="shareApp()" style="background: rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.2);">
-                <div style="display:flex; align-items:center; gap:15px;">
-                    <i class="fas fa-share-alt" style="color:var(--vw-light);"></i>
-                    <div>
-                        <div style="font-size:15px; font-weight:bold;">Compartir App</div>
-                        <div style="font-size:11px; opacity:0.7;">Envía esto a tu familia</div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div style="margin-top:25px; padding:20px; background:linear-gradient(135deg, #1a1a1a, #000); border-radius:20px; border:1px solid rgba(255,255,255,0.1); text-align:center;">
             <div style="font-size:14px; margin-bottom:5px;">¿Contento con tu nuevo Volkswagen?</div>
-            <div style="font-size:11px; opacity:0.6; margin-bottom:15px;">Ayúdame a seguir mejorando con una valoración.</div>
-            
             <button onclick="window.open('https://search.google.com/local/writereview?placeid=ChIJc6vL3fIvQg0RGT8iQzPAenc', '_blank')" 
-                    style="background:white; color:black; border:none; padding:12px 25px; border-radius:50px; font-weight:bold; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; margin:0 auto; box-shadow: 0 5px 15px rgba(255,255,255,0.1);">
+                    style="background:white; color:black; border:none; padding:12px 25px; border-radius:50px; font-weight:bold; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; margin:0 auto;">
                 <i class="fab fa-google"></i> Dejar Reseña en Google
             </button>
+        </div>
+
+        <div class="author-footer">
+            DEVELOPED BY MANUEL ARJONA CARRERA © 2026
         </div>
 
     </section>
@@ -334,14 +322,9 @@
             <span style="font-weight: bold; letter-spacing: 1px;">VIDEO GUÍA</span>
             <div style="width:22px;"></div>
         </div>
-
-        <div class="video-section-title">
-            <i class="fas fa-star"></i> Descubre tu <span id="video-car-title">Coche</span>
-        </div>
         <div class="video-box">
             <iframe id="video-player-frame" width="100%" height="100%" src="" frameborder="0" allowfullscreen></iframe>
         </div>
-        <p style="font-size:12px; opacity:0.6; margin-bottom:30px;">Conoce los detalles principales de tu modelo en este vídeo oficial.</p>
     </section>
 
     <section id="s-services" class="screen">
@@ -350,50 +333,12 @@
             <span style="font-weight: bold; letter-spacing: 1px;">SERVICIOS VW</span>
             <div style="width:22px;"></div>
         </div>
-
-        <div class="service-card highlight" onclick="window.open('tel:900100238', '_self')">
-            <div class="service-icon" style="background:rgba(255,255,255,0.2);"><i class="fas fa-phone"></i></div>
+        <div class="service-card" onclick="window.open('tel:900100238', '_self')" style="background:rgba(176,0,0,0.2)">
+            <i class="fas fa-phone"></i>
             <div class="service-info">
                 <h3>Asistencia 24h</h3>
-                <p>900 100 238 · Llamada de emergencia</p>
+                <p>900 100 238</p>
             </div>
-        </div>
-
-        <div class="advisor-card">
-            <div class="advisor-header">
-                <div class="advisor-avatar">AB</div>
-                <div>
-                    <h3 style="margin:0; font-size:18px;">Álvaro Beltrán</h3>
-                    <p style="margin:0; font-size:13px; opacity:0.6;">Cita Taller y Servicio</p>
-                </div>
-            </div>
-            <div class="advisor-buttons">
-                <div class="advisor-btn primary" onclick="window.open('tel:648006146', '_self')">
-                    <i class="fas fa-phone"></i> Llamar
-                </div>
-                <div class="advisor-btn" onclick="window.open('mailto:alvaro.beltran@vwmadrid.es', '_blank')">
-                    <i class="fas fa-envelope"></i> Email
-                </div>
-            </div>
-        </div>
-
-        <div class="service-card" onclick="navTo('s-dealership')">
-            <div class="service-icon"><i class="fas fa-info-circle"></i></div>
-            <div class="service-info">
-                <h3>Atención al Cliente</h3>
-                <p>Datos generales del Concesionario</p>
-            </div>
-            <i class="fas fa-chevron-right" style="margin-left:auto; opacity:0.3;"></i>
-        </div>
-
-        <div style="margin-top:20px; padding:20px; background:rgba(255,255,255,0.03); border-radius:15px; border:1px dashed var(--border);">
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                <i class="fas fa-shield-alt" style="color:var(--vw-light);"></i>
-                <span style="font-weight:bold; font-size:14px;">Tu Garantía</span>
-            </div>
-            <p style="font-size:12px; opacity:0.7; line-height:1.5;">
-                Disfrutas de una garantía oficial de 3 años. Incluye asistencia en viaje y defectos de fabricación.
-            </p>
         </div>
     </section>
 
@@ -403,116 +348,62 @@
             <span style="font-weight: bold; letter-spacing: 1px;">PREPARA TU ENTREGA</span>
             <div style="width:22px;"></div>
         </div>
-
-        <div style="font-size:14px; opacity:0.8; margin-bottom:10px;">Mira este vídeo para activarlo paso a paso:</div>
-        
-        <div class="video-box" style="height: 200px; margin-bottom: 25px;">
-            <video width="100%" height="100%" controls style="object-fit: cover; background: black;">
-                <source src="Conexion.mp4" type="video/mp4">
-                Tu navegador no soporta videos.
-            </video>
-        </div>
-
-        <div class="checklist-item">
-            <div class="left-content" onclick="toggleCheck(this.parentElement)">
+        <div class="checklist-item" onclick="toggleCheck(this)">
+            <div class="left-content">
                 <div class="check-circle"><i class="fas fa-check"></i></div>
                 <span>Descargar App Volkswagen</span>
             </div>
-            <div class="link-action" onclick="window.open('https://play.google.com/store/apps/details?id=com.volkswagen.weconnect&pcampaignid=web_share', '_blank')">
-                <i class="fas fa-download"></i>
-            </div>
         </div>
-
-        <div class="checklist-item" onclick="toggleCheck(this)">
-            <div class="left-content">
-                <div class="check-circle"><i class="fas fa-check"></i></div>
-                <span>Crear cuenta desde la App</span>
-            </div>
-        </div>
-
-        <div class="checklist-item" onclick="toggleCheck(this)">
-            <div class="left-content">
-                <div class="check-circle"><i class="fas fa-check"></i></div>
-                <span>Traer DNI / Carnet Conducir</span>
-            </div>
-        </div>
-
-        <div class="checklist-item" onclick="toggleCheck(this)">
-            <div class="left-content">
-                <div class="check-circle"><i class="fas fa-check"></i></div>
-                <span>Juego de llaves (si dejas coche)</span>
-            </div>
-        </div>
-        
-        <div style="margin-top:40px;">
-            <p style="font-size:12px; opacity:0.6; margin-bottom:10px; text-align:center;">¿Has completado todos los pasos?</p>
-            <button class="btn-glow" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;" onclick="notifyAccountCreated()">
-                <span style="font-size:16px;">Ya tengo todo preparado</span>
-                <span style="font-size:12px; font-weight:400; opacity:0.9; color:rgba(255,255,255,0.8);">
-                    Avisar a mi Entregador <i class="fab fa-whatsapp" style="margin-left:3px;"></i>
-                </span>
-            </button>
-        </div>
+        <button class="btn-glow" onclick="notifyAccountCreated()">Avisar a mi Entregador <i class="fab fa-whatsapp"></i></button>
     </section>
 
-    <section id="s-dealership" class="screen" style="padding-top:0;">
-        <div class="dash-header" style="position:relative; z-index:10; padding-top:25px; margin-bottom:10px;">
-            <i class="fas fa-arrow-left" style="font-size:22px; cursor:pointer; text-shadow: 0 2px 5px rgba(0,0,0,0.5);" onclick="navTo('s-dash')"></i>
-            <span style="font-weight: bold; letter-spacing: 1px; text-shadow: 0 2px 5px rgba(0,0,0,0.5);">TU CONCESIONARIO</span>
-            <div style="width:22px;"></div>
+    <section id="s-dealership" class="screen">
+        <div class="dash-header">
+            <i class="fas fa-arrow-left" style="font-size:22px; cursor:pointer;" onclick="navTo('s-dash')"></i>
+            <span>CONCESIONARIO</span>
         </div>
-        <div class="dealer-hero">
-            <img src="images/concesionario.jpg" onerror="this.src='https://via.placeholder.com/400x300/001E50/FFFFFF?text=Volkswagen+Madrid';">
-        </div>
-        <div class="dealer-info-container">
-            <h3 class="dealer-title">Volkswagen Madrid</h3>
-            <div class="dealer-link" onclick="window.open('https://maps.google.com/?cid=8609404964074307353&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ', '_blank')">
-                <i class="fas fa-map-marker-alt"></i><span>C. de Sofía, 18, 28022 Madrid</span>
-            </div>
-            <div class="dealer-link" onclick="window.open('tel:913136450', '_self')">
-                <i class="fas fa-phone"></i><span>913 13 64 50</span>
-            </div>
-            <div class="dealer-link last" onclick="window.open('https://www.volkswagenmadrid.es', '_blank')">
-                <i class="fas fa-globe"></i><span>www.volkswagenmadrid.es</span>
-            </div>
-            <button class="btn-glow" onclick="window.open('https://maps.google.com/?cid=8609404964074307353&g_mp=Cidnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLlNlYXJjaFRleHQ', '_blank')">
-                <i class="fas fa-directions"></i> Cómo llegar
-            </button>
-        </div>
+        <h3>Volkswagen Madrid</h3>
+        <p>C. de Sofía, 18, 28022 Madrid</p>
+        <button class="btn-glow" onclick="window.open('https://maps.google.com/?q=Volkswagen+Madrid+Calle+Sofia+18')">Cómo llegar</button>
     </section>
 
     <section id="s-shop" class="screen">
         <div class="dash-header">
             <i class="fas fa-arrow-left" style="font-size:22px; cursor:pointer;" onclick="navTo('s-dash')"></i>
-            <span style="font-weight: bold; letter-spacing: 1px;">ACCESORIOS</span>
-            <div style="width:22px;"></div>
+            <span>ACCESORIOS</span>
         </div>
-        <p style="font-size:12px; opacity:0.7; text-align:center; margin-bottom:10px;">Consulta nuestro catálogo oficial</p>
         <iframe src="catalogo.pdf" class="pdf-viewer"></iframe>
-        <div class="request-box">
-            <div class="request-label">¿Te gustaría tener algún accesorio en tu nuevo <strong id="shop-car-model" style="color:var(--vw-light)">Volkswagen</strong>?</div>
-            <textarea id="wishlist-text" placeholder="Escribe aquí lo que necesites..."></textarea>
-            <button class="send-btn" onclick="sendCustomRequest()"><i class="fab fa-whatsapp"></i> Pídemelo aquí</button>
-        </div>
+        <textarea id="wishlist-text" placeholder="Escribe aquí lo que necesites..."></textarea>
+        <button class="send-btn" onclick="sendCustomRequest()">Pídemelo por WhatsApp</button>
     </section>
 
     <div id="date-modal" class="modal-overlay">
         <div class="modal-box">
-            <h3 style="margin-top:0;">Activar Cuenta Atrás</h3>
-            <p style="font-size:13px; opacity:0.8; margin-bottom:20px;">Si ya tienes tu cita confirmada, selecciónala aquí.</p>
-            <input type="datetime-local" id="modal-date-input" style="background:#333;">
+            <h3>Activar Cuenta Atrás</h3>
+            <input type="datetime-local" id="modal-date-input" style="background:#333; color:white; padding:10px; border-radius:10px; border:none; width:100%;">
             <button class="btn-glow" onclick="saveDate()">Guardar Fecha</button>
-            <button style="background:none; border:none; color:#999; margin-top:15px; cursor:pointer;" onclick="closeDateModal()">Cancelar</button>
+            <button style="background:none; border:none; color:#999; margin-top:15px;" onclick="closeDateModal()">Cancelar</button>
         </div>
     </div>
 
 </div>
 
 <script>
+    /**
+     * SEGURIDAD ANTI-COPIA POR MANUEL ARJONA CARRERA
+     */
+    // 1. Bloqueo de Teclas de Inspección (F12, Ctrl+U, etc)
+    document.onkeydown = function(e) {
+        if(e.keyCode == 123) return false; // F12
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) return false;
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+        if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+    }
+
     const myPhone = "34660050228";
     let currentUser = null; 
 
-    // LISTA DE COCHES
     const cars = [
         { name: "Golf", file: "Golf.png", vid: "X5pVXMkeZbc" },
         { name: "Tiguan", file: "Tiguan.png", vid: "mq40yhpczSw" },
@@ -546,28 +437,22 @@
     });
 
     function checkSession() {
-        try {
-            const savedData = localStorage.getItem('vw_user_data');
-            if (savedData) {
-                currentUser = JSON.parse(savedData);
-                loadDashboard();
-            } else {
-                document.getElementById('s-login').classList.add('active');
-            }
-        } catch (e) {
+        const savedData = localStorage.getItem('vw_user_data');
+        if (savedData) {
+            currentUser = JSON.parse(savedData);
+            loadDashboard();
+        } else {
             document.getElementById('s-login').classList.add('active');
         }
     }
 
     let tempSelectedCar = null;
-
     function loadCarList() {
         const drop = document.getElementById('car-drop');
-        if (!drop) return;
         cars.forEach(c => {
             let div = document.createElement('div');
             div.className = 'car-item';
-            div.innerHTML = `<span>${c.name}</span><i class="fas fa-chevron-right" style="opacity:0.3; font-size:12px;"></i>`;
+            div.innerHTML = `<span>${c.name}</span><i class="fas fa-chevron-right"></i>`;
             div.onclick = () => {
                 tempSelectedCar = c;
                 document.getElementById('select-label').innerText = c.name;
@@ -577,212 +462,93 @@
         });
     }
     
-    function toggleDrop() { 
-        const drop = document.getElementById('car-drop');
-        if(drop) drop.classList.toggle('show'); 
-    }
+    function toggleDrop() { document.getElementById('car-drop').classList.toggle('show'); }
 
     function firstLogin() {
-        const nameInput = document.getElementById('username');
-        const name = nameInput ? nameInput.value : "";
+        const name = document.getElementById('username').value;
         if (!name || !tempSelectedCar) return alert("Por favor, rellena los datos.");
         currentUser = { name: name, car: tempSelectedCar, deliveryDate: null };
         localStorage.setItem('vw_user_data', JSON.stringify(currentUser));
-        const loginScreen = document.getElementById('s-login');
-        if(loginScreen) loginScreen.classList.remove('active');
-        const transScreen = document.getElementById('s-transition');
-        const transName = document.getElementById('trans-name');
-        if(transName) transName.innerText = name.toUpperCase();
-        if(transScreen) transScreen.classList.add('active');
+        document.getElementById('s-login').classList.remove('active');
+        document.getElementById('trans-name').innerText = name.toUpperCase();
+        document.getElementById('s-transition').classList.add('active');
         setTimeout(() => {
-            if(transScreen) transScreen.style.opacity = '0';
-            setTimeout(() => {
-                if(transScreen) {
-                    transScreen.classList.remove('active');
-                    transScreen.style.opacity = '1';
-                }
-                loadDashboard();
-            }, 500);
-        }, 2500);
+            document.getElementById('s-transition').classList.remove('active');
+            loadDashboard();
+        }, 3000);
     }
 
     function loadDashboard() {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById('s-dash').classList.add('active');
-        if(currentUser) {
-            document.getElementById('dash-name').innerText = currentUser.name;
-            document.getElementById('cover-car-name').innerText = currentUser.car.name.toUpperCase();
-            document.getElementById('shop-car-model').innerText = currentUser.car.name;
-            
-            // Imagen del coche
-            const img = document.getElementById('real-car-img');
-            if(img) img.src = "images/" + currentUser.car.file;
-            
-            // Video del coche
-            const vidPlayerFrame = document.getElementById('video-player-frame');
-            const btnCarName = document.getElementById('btn-car-name');
-            const vidTitle = document.getElementById('video-car-title');
-            
-            if(vidPlayerFrame && currentUser.car.vid) {
-                vidPlayerFrame.src = `https://www.youtube.com/embed/${currentUser.car.vid}?rel=0&modestbranding=1`;
-            }
-            if(btnCarName) btnCarName.innerText = currentUser.car.name;
-            if(vidTitle) vidTitle.innerText = currentUser.car.name;
-
-            renderStatusWidget();
-        }
+        document.getElementById('dash-name').innerText = currentUser.name;
+        document.getElementById('cover-car-name').innerText = currentUser.car.name.toUpperCase();
+        document.getElementById('real-car-img').src = "images/" + currentUser.car.file;
+        document.getElementById('video-player-frame').src = `https://www.youtube.com/embed/${currentUser.car.vid}`;
+        renderStatusWidget();
     }
 
     function reveal() {
-        const cover = document.getElementById('cover');
-        const stage = document.getElementById('car-stage');
-        if(cover) cover.classList.add('open');
-        if(stage) stage.classList.add('revealed');
-        if(navigator.vibrate) navigator.vibrate(40);
+        document.getElementById('cover').classList.add('open');
+        document.getElementById('car-stage').classList.add('revealed');
     }
 
-    // --- AQUÍ ES DONDE ESTÁ EL ENLACE A CALENDLY ---
-function renderStatusWidget() {
+    function renderStatusWidget() {
         const box = document.getElementById('status-widget');
-        if (!box) return;
-
-        // -----------------------------------------------------------
-        // 👇 TU ENLACE DE MICROSOFT BOOKINGS (YA CONFIGURADO) 👇
         const linkBookings = 'https://outlook.office.com/book/EntregasVWMadrid@porscheholding.onmicrosoft.com/'; 
-        // -----------------------------------------------------------
-
         if (!currentUser.deliveryDate) {
-            // SI NO TIENE CITA: Mostramos el botón de reservar
-            box.innerHTML = `
-                <div style="font-size:14px; margin-bottom:15px; opacity:0.9;">¿Aún no tienes fecha de entrega?</div>
-                
-                <button class="btn-calendly" onclick="window.open('${linkBookings}','_blank')">
-                    <i class="fas fa-calendar-check"></i> RESERVAR CITA DE ENTREGA
-                </button>
-                
-                <div style="margin-top:10px; font-size:10px; opacity:0.6;">
-                    Sistema automático de gestión de citas Volkswagen
-                </div>
-
-                <div style="margin-top:15px;">
-                    <button class="btn-set-date" onclick="openDateModal()">Ya tengo fecha confirmada</button>
-                </div>
-            `;
+            box.innerHTML = `<button class="btn-calendly" onclick="window.open('${linkBookings}','_blank')">RESERVAR CITA DE ENTREGA</button>
+                             <button class="btn-set-date" onclick="openDateModal()">Ya tengo fecha</button>`;
         } else {
-            // SI YA TIENE CITA: Mostramos la cuenta atrás
-            box.innerHTML = `
-                <div style="display:flex; justify-content:space-between; width:100%; padding:0 10px;">
-                    <div style="font-size:9px; opacity:0.6; letter-spacing:1px;">TIEMPO RESTANTE</div>
-                    <div style="font-size:9px; opacity:0.6; cursor:pointer;" onclick="openDateModal()"><i class="fas fa-edit"></i> Editar</div>
-                </div>
-                <div class="timer-grid">
-                    <div class="time-unit"><div id="d-days">0</div><div>DÍAS</div></div>
-                    <div class="time-unit"><div id="d-hours">0</div><div>HRS</div></div>
-                    <div class="time-unit"><div id="d-mins">0</div><div>MIN</div></div>
-                    <div class="time-unit"><div id="d-secs">0</div><div>SEG</div></div>
-                </div>
-            `;
+            box.innerHTML = `<div class="timer-grid">
+                <div class="time-unit"><div id="d-days">0</div><div>DÍAS</div></div>
+                <div class="time-unit"><div id="d-hours">0</div><div>HRS</div></div>
+                <div class="time-unit"><div id="d-mins">0</div><div>MIN</div></div>
+                <div class="time-unit"><div id="d-secs">0</div><div>SEG</div></div>
+            </div><button class="btn-set-date" style="margin-top:10px" onclick="openDateModal()">Cambiar fecha</button>`;
             setInterval(updateTimer, 1000);
-            updateTimer();
         }
-    }
-
-    function toggleCheck(item) {
-        item.classList.toggle('checked');
-        if(navigator.vibrate) navigator.vibrate(20);
-    }
-
-    function notifyAccountCreated() {
-        const msg = `Hola Manuel, ya he completado la checklist. Ya tengo todo preparado, avisa a mi entregador.`;
-        window.open(`https://wa.me/${myPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-    }
-
-    function openDateModal() { document.getElementById('date-modal').style.display = 'flex'; }
-    function closeDateModal() { document.getElementById('date-modal').style.display = 'none'; }
-
-    function saveDate() {
-        const input = document.getElementById('modal-date-input').value;
-        if(!input) return alert("Selecciona una fecha válida.");
-        currentUser.deliveryDate = new Date(input).getTime();
-        localStorage.setItem('vw_user_data', JSON.stringify(currentUser)); 
-        closeDateModal();
-        renderStatusWidget(); 
-        alert("¡Cuenta atrás activada!");
     }
 
     function updateTimer() {
         if (!currentUser.deliveryDate) return;
-        const now = new Date().getTime();
-        const distance = currentUser.deliveryDate - now;
-        const elDays = document.getElementById('d-days');
-        if(!elDays) return;
-        if (distance < 0) {
-            const widget = document.getElementById('status-widget');
-            if(widget) widget.innerHTML = "<div style='font-size:16px; font-weight:bold; color:var(--vw-light); padding:20px;'>¡HOY ES EL DÍA!</div>";
-            return;
-        }
-        document.getElementById('d-days').innerText = Math.floor(distance / (1000 * 60 * 60 * 24));
-        document.getElementById('d-hours').innerText = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        document.getElementById('d-mins').innerText = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        document.getElementById('d-secs').innerText = Math.floor((distance % (1000 * 60)) / 1000);
+        const dist = currentUser.deliveryDate - new Date().getTime();
+        if (dist < 0) return document.getElementById('status-widget').innerHTML = "¡ES EL DÍA!";
+        document.getElementById('d-days').innerText = Math.floor(dist / 86400000);
+        document.getElementById('d-hours').innerText = Math.floor((dist % 86400000) / 3600000);
+        document.getElementById('d-mins').innerText = Math.floor((dist % 3600000) / 60000);
+        document.getElementById('d-secs').innerText = Math.floor((dist % 60000) / 1000);
     }
 
-    function sendCustomRequest() {
-        const wishlist = document.getElementById('wishlist-text').value;
-        if (!wishlist.trim()) return alert("Por favor, escribe lo que necesitas.");
-        const name = currentUser.name;
-        let dateStr = "Sin fecha";
-        if(currentUser.deliveryDate) {
-            const d = new Date(currentUser.deliveryDate);
-            dateStr = d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        }
-        const msg = `Hola Manuel, soy ${name}.\n\nPara mi ${currentUser.car.name} (Fecha: ${dateStr}), me interesan estos accesorios:\n\n📝 ${wishlist}`;
-        window.open(`https://wa.me/${myPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-        document.getElementById('wishlist-text').value = ""; 
+    function openDateModal() { document.getElementById('date-modal').style.display = 'flex'; }
+    function closeDateModal() { document.getElementById('date-modal').style.display = 'none'; }
+    function saveDate() {
+        const val = document.getElementById('modal-date-input').value;
+        if(!val) return;
+        currentUser.deliveryDate = new Date(val).getTime();
+        localStorage.setItem('vw_user_data', JSON.stringify(currentUser));
+        closeDateModal();
+        renderStatusWidget();
     }
 
     function navTo(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        const target = document.getElementById(id);
-        if(target) {
-            target.classList.add('active');
-            window.scrollTo(0,0);
-        }
-    }
-    
-    function whatsapp() {
-        const msg = `Hola Manuel, soy ${currentUser.name}. Tengo una duda sobre mi entrega.`;
-        window.open(`https://wa.me/${myPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-    }
-    
-    function shareApp() {
-        if (navigator.share) {
-            navigator.share({
-                title: 'Mi Nuevo Volkswagen',
-                text: '¡Mira! Ya está listo mi coche nuevo. Aquí tienes todos los detalles:',
-                url: window.location.href
-            });
-        } else {
-            alert("Copia este enlace: " + window.location.href);
-        }
+        document.getElementById(id).classList.add('active');
     }
 
-    function imgError(image) {
-        image.style.display = 'none'; 
-        const debugMsg = document.createElement('div');
-        debugMsg.className = 'debug-msg';
-        const fileName = image.src.split('/').pop();
-        debugMsg.innerText = 'Error: No encuentro ' + fileName;
-        image.parentNode.appendChild(debugMsg);
+    function whatsapp() {
+        window.open(`https://wa.me/${myPhone}?text=Hola Manuel, soy ${currentUser.name}`, '_blank');
     }
+
+    function toggleCheck(el) { el.classList.toggle('checked'); }
     
+    function notifyAccountCreated() {
+        window.open(`https://wa.me/${myPhone}?text=Ya tengo todo listo para mi entrega.`, '_blank');
+    }
+
     function resetApp() {
-        if(confirm("¿Borrar datos y reiniciar la App?")) {
-            localStorage.removeItem('vw_user_data');
-            location.reload();
-        }
+        if(confirm("Reiniciar?")) { localStorage.removeItem('vw_user_data'); location.reload(); }
     }
 </script>
 </body>
 </html>
-
