@@ -40,50 +40,42 @@
         .screen.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
-        /* CABECERA PREMIUM BLINDADA */
+        /* TITULO M-40 GIGANTE */
         .welcome-header { text-align: center; margin-top: 40px; margin-bottom: 25px; padding: 0 10px; }
         .welcome-header h1 { font-weight: 100; font-size: 24px; line-height: 1.1; margin: 0; color: white; text-transform: uppercase; }
         .welcome-header h1 b { font-weight: 700; display: block; font-size: 32px; letter-spacing: -1px; margin-top: 5px; }
         .welcome-header h1 span { display: block; font-weight: 900; font-size: clamp(45px, 12vw, 55px); color: white; margin-top: -5px; }
         .welcome-header p { font-size: 14px; opacity: 0.7; margin-top: 20px; font-weight: 300; }
 
-        /* RESET BOTÓN */
         .reset-btn { position: fixed; top: 15px; right: 15px; font-size: 10px; opacity: 0.5; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 20px; z-index: 10000; color: white; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); }
 
-        /* SPLASH PURE WHITE */
         #s-splash { position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:9999; display:flex; justify-content:center; align-items:center; }
         .splash-logo { width: 100px; animation: pulse 2.5s infinite; filter: brightness(0) invert(1) !important; }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 
         .section-title { font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.6); letter-spacing: 1.5px; margin: 30px 0 10px 0; text-transform: uppercase; }
 
-        /* BENTO GRID */
         .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .tile { background: var(--glass); padding: 20px; border-radius: 22px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--glass-border); cursor: pointer; transition: 0.2s; }
         .tile.wide { grid-column: span 2; flex-direction: row; align-items: center; justify-content: space-between; }
         .icon-box { width: 42px; height: 42px; background: rgba(0, 176, 240, 0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--vw-light); }
 
-        /* TIMER GRID */
         .status-box { background: var(--glass); padding: 25px; border-radius: 25px; margin-bottom: 25px; border: 1px solid var(--glass-border); text-align: center; }
         .timer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
         .time-unit div:first-child { font-size: 22px; font-weight: 800; color: var(--vw-light); font-variant-numeric: tabular-nums; }
         .time-unit div:last-child { font-size: 9px; opacity: 0.6; font-weight: 600; text-transform: uppercase; }
 
-        /* LONA */
         .reveal-container { position: relative; width: 100%; height: 320px; border-radius: 35px; overflow: hidden; margin-bottom: 25px; background: radial-gradient(circle at center 80%, #2a4a70 0%, #000000 70%); border: 1px solid var(--glass-border); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; }
         .car-photo { width: 100%; height: auto; object-fit: contain; z-index: 3; transition: 1.2s ease-out; -webkit-box-reflect: below -25px linear-gradient(transparent, transparent 60%, rgba(255,255,255,0.15)); }
         .blue-cover { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, #001e50 0%, #0044a0 50%, #001e50 100%); z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.8s ease; cursor: pointer; box-shadow: inset 0 0 100px rgba(0,0,0,0.5); }
         .blue-cover.open { transform: translateY(-110%) skewY(-5deg); opacity: 0; }
 
-        /* BOTONES */
         .btn-glow { background: linear-gradient(135deg, #00B0F0, #006090); color: white; border: none; padding: 18px; border-radius: 50px; font-weight: 700; width: 100%; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; font-size: 13px; margin-top: 10px; }
         .btn-checkin { background: linear-gradient(135deg, #11998e, #38ef7d); color: #000; border: none; padding: 18px; border-radius: 50px; font-weight: 800; width: 100%; margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
 
-        /* RESEÑA GOOGLE RESTAURADA */
         .review-card { margin-top: 30px; padding: 25px; border-radius: 25px; text-align: center; background: var(--glass); border: 1px solid var(--glass-border); }
         .review-btn { background: white; color: black; border: none; padding: 14px 28px; border-radius: 50px; font-size: 12px; font-weight: 800; cursor: pointer; margin-top: 15px; display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; }
 
-        /* CHECKLIST */
         .checklist-group { margin-bottom: 20px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 25px; border: 1px solid var(--glass-border); }
         .checklist-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--glass); border-radius: 16px; margin-bottom: 10px; border: 1px solid var(--glass-border); cursor: pointer; }
         .check-circle { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
@@ -97,11 +89,12 @@
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .grid-item { background: var(--glass); padding: 15px; border-radius: 18px; text-align: center; border: 1px solid var(--glass-border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
         .w-red { color: #ff4444; } .w-orange { color: #ff9800; } .w-blue { color: var(--vw-light); }
-
+        
         .dealer-hero { width: 110%; height: 220px; margin-left: -5%; margin-top: -25px; margin-bottom: 25px; object-fit: cover; border-bottom-left-radius: 40px; border-bottom-right-radius: 40px; }
         .pdf-viewer { width: 100%; height: 450px; border-radius: 20px; border: 1px solid var(--glass-border); background: white; margin-bottom: 15px; }
-        
-        #toast { visibility: hidden; min-width: 250px; background-color: white; color: black; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 9999; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 13px; font-weight: 600; opacity: 0; transition: 0.3s; }
+
+        /* TOAST CLICKABLE PARA INSTALACIÓN */
+        #toast { visibility: hidden; min-width: 280px; background-color: white; color: black; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 9999; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 13px; font-weight: 700; opacity: 0; transition: 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: pointer; }
         #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
     </style>
 </head>
@@ -109,10 +102,7 @@
 
 <div class="app-container">
     <div class="reset-btn" onclick="localStorage.clear(); location.reload();">RESET APP</div>
-    
-    <div id="s-splash">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" class="splash-logo">
-    </div>
+    <div id="s-splash"><img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" class="splash-logo"></div>
 
     <section id="s-welcome" class="screen">
         <div class="welcome-header">
@@ -130,7 +120,6 @@
         <div style="text-align:center; margin-top:60px;">
             <i class="fas fa-arrow-left" onclick="navTo('s-welcome')" style="float:left; font-size:20px;"></i>
             <h2 style="font-weight:200;">Acceso Clientes</h2>
-            <p style="opacity:0.6; font-size:12px; margin-bottom:20px;">INTRODUCE TU MATRÍCULA</p>
             <input type="text" id="username" placeholder="0000 XXX" style="width:100%; padding:18px; background:rgba(255,255,255,0.1); border:1px solid var(--glass-border); border-radius:15px; color:white; text-align:center; font-size:22px; font-weight:800; outline:none; text-transform:uppercase;">
             <button class="btn-glow" style="margin-top:20px;" onclick="doLogin()">ACCEDER</button>
         </div>
@@ -166,20 +155,18 @@
                 </div><i class="fab fa-whatsapp" style="color:#25D366; font-size:32px;"></i>
             </div>
             <div class="tile wide" style="background: linear-gradient(135deg, rgba(0, 30, 80, 0.9), rgba(0,0,0,0.5));" onclick="navTo('s-video')">
-                <div><strong>Tu Coche al Detalle</strong><br><span style="font-size:11px; opacity:0.7;">Video Guía Interactiva</span></div><i class="fas fa-play-circle" style="font-size:35px;"></i>
+                <div><strong>Tu Coche al Detalle</strong><br><span style="font-size:11px; opacity:0.7;">Vídeo Guía Interactiva</span></div><i class="fas fa-play-circle" style="font-size:35px;"></i>
             </div>
             <div class="tile" onclick="navTo('s-services')"><div class="icon-box"><i class="fas fa-life-ring"></i></div><span>Asistencia</span></div>
             <div class="tile" onclick="navTo('s-checklist')"><div class="icon-box"><i class="fas fa-clipboard-check"></i></div><span>Entrega</span></div>
             <div class="tile" onclick="navTo('s-shop')"><div class="icon-box"><i class="fas fa-shopping-bag"></i></div><span>Accesorios</span></div>
             <div class="tile" onclick="navTo('s-dealership')"><div class="icon-box"><i class="fas fa-map-marker-alt"></i></div><span>Concesionario</span></div>
         </div>
-        
         <div class="review-card">
             <h4 style="margin:0; font-size:18px;">¿Qué tal tu experiencia?</h4>
             <div style="color: #FFD700; font-size: 20px; margin: 10px 0;">★★★★★</div>
             <button class="review-btn" onclick="window.open('https://search.google.com/local/writereview?placeid=ChIJc6vL3fIvQg0RGT8iQzPAenc')">VALORAR EN GOOGLE</button>
         </div>
-
         <div style="text-align:center; padding:40px 0; opacity:0.4; font-size:10px; letter-spacing:1px;">
             Manuel Arjona Carrera © 2026<br>CASTELLANA WAGEN M-40
         </div>
@@ -188,13 +175,13 @@
     <section id="s-services" class="screen">
         <div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;"><i class="fas fa-arrow-left" onclick="navTo('s-dash')"></i><span style="font-weight:800; font-size:18px;">ASISTENCIA</span></div>
         <div onclick="window.open('tel:900100238')" style="background:rgba(255,68,68,0.1); padding:20px; border-radius:25px; display:flex; align-items:center; gap:15px; border:1px solid rgba(255,68,68,0.2); margin-bottom:15px;">
-            <i class="fas fa-truck-pickup" style="color:#ff4444; font-size:24px;"></i><div><div style="font-weight:bold;">Emergencia y Grúa 24h</div><div style="font-size:12px; opacity:0.8;">900 100 238 (Service)</div></div>
+            <i class="fas fa-truck-pickup" style="color:#ff4444; font-size:24px;"></i><div><strong>Emergencia y Grúa 24h</strong><br><small>900 100 238 (Service)</small></div>
         </div>
         <div class="section-title">TESTIGOS DE ALERTA</div>
         <div class="grid-2">
             <div class="grid-item" onclick="showToast('Pare motor inmediatamente.')"><i class="fas fa-triangle-exclamation w-red"></i><span>Avería</span></div>
             <div class="grid-item" onclick="showToast('Revise nivel de aceite.')"><i class="fas fa-oil-can w-orange"></i><span>Aceite</span></div>
-            <div class="grid-item" onclick="showToast('Verifique neumáticos.')"><i class="fas fa-gauge-high w-orange"></i><span>Presión</span></div>
+            <div class="grid-item" onclick="showToast('Verifique presión neumáticos.')"><i class="fas fa-gauge-high w-orange"></i><span>Presión</span></div>
             <div class="grid-item" onclick="showToast('Rellene AdBlue (mínimo 5L).')"><i class="fas fa-gas-pump w-blue"></i><span>AdBlue</span></div>
         </div>
         <div class="section-title">FAQs</div>
@@ -249,7 +236,7 @@
                 <p style="margin:0 0 10px 0;" onclick="window.open('tel:913136450')"><i class="fas fa-phone w-blue"></i> 913 13 64 50</p>
                 <p style="margin:0;" onclick="window.open('https://www.volkswagenmadrid.es')"><i class="fas fa-globe w-blue"></i> www.volkswagenmadrid.es</p>
             </div>
-            <button class="btn-glow" style="margin-top:20px;" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=Castellana+Wagen+M40+Madrid')">🚀 CÓMO LLEGAR (GPS)</button>
+            <button class="btn-glow" style="margin-top:20px;" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=Calle+de+Sofia+18+Madrid')">🚀 CÓMO LLEGAR (GPS)</button>
         </div>
     </section>
 
@@ -258,7 +245,7 @@
         <iframe id="video-frame" width="100%" height="220" src="" frameborder="0" allowfullscreen style="border-radius:25px; border:1px solid var(--glass-border);"></iframe>
         <div class="section-title">TECNOLOGÍA A BORDO</div>
         <div class="grid-2">
-            <div class="grid-item" onclick="showToast('Cuadro digital 100% personalizable.')"><i class="fas fa-tachometer-alt w-blue"></i><span>Cockpit</span></div>
+            <div class="grid-item" onclick="showToast('Cuadro digital personalizable.')"><i class="fas fa-tachometer-alt w-blue"></i><span>Cockpit</span></div>
             <div class="grid-item" onclick="showToast('Móvil inalámbrico.')"><i class="fab fa-bluetooth-b w-blue"></i><span>App Connect</span></div>
             <div class="grid-item" onclick="showToast('Asistentes IQ.Drive.')"><i class="fas fa-shield-alt w-blue"></i><span>IQ.Drive</span></div>
             <div class="grid-item" onclick="showToast('Aparcamiento automático.')"><i class="fas fa-parking w-blue"></i><span>Park Assist</span></div>
@@ -279,10 +266,11 @@
 
     window.onpopstate = function() { if (user) { navTo('s-dash'); } else { navTo('s-welcome'); } };
 
+    // LOGICA INSTALACION ARREGLADA
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
-        showToast("Pulsa aquí para instalar como App", 5000);
+        showToast("📱 PULSA AQUÍ PARA INSTALAR LA APP", 8000, true);
     });
 
     window.onload = function() {
@@ -347,18 +335,48 @@
 
     function reveal() { document.getElementById('cover').classList.add('open'); confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#00B0F0', '#FFFFFF', '#001E50'] }); }
     function toggleCheck(e) { e.classList.toggle('checked'); }
-    function showToast(t, time = 3000) { var x = document.getElementById("toast"); x.className = "show"; x.innerText = t; setTimeout(()=>x.className="", time); }
+    
+    function showToast(t, time = 3000, isInstall = false) { 
+        var x = document.getElementById("toast"); 
+        x.className = "show"; 
+        x.innerText = t; 
+        if(isInstall) {
+            x.onclick = function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choice) => {
+                        if (choice.outcome === 'accepted') { x.className = ""; }
+                        deferredPrompt = null;
+                    });
+                } else {
+                    alert("Si usas iPhone: Pulsa el botón 'Compartir' (cuadrado con flecha) y elige 'Añadir a la pantalla de inicio'");
+                }
+            };
+        }
+        setTimeout(()=>x.className="", time); 
+    }
+    
     function notifyChecklist() { 
         const btn = document.getElementById('notifyBtn');
         btn.style.background = "#25D366"; btn.style.color = "white";
         btn.innerHTML = '<i class="fas fa-check-circle"></i> ASESOR AVISADO';
-        var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228";
+        var t = (user && user.agente && user.agente.includes("ALEJANDRO")) ? "34618969208" : "34660050228";
         setTimeout(() => { window.open("https://wa.me/"+t+"?text=Todo listo para la entrega."); }, 800);
     }
-    function whatsappMe() { var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228"; window.open("https://wa.me/"+t); }
-    function notifyArrival() { var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228"; window.open("https://wa.me/"+t+"?text=Ya estoy aquí."); }
+
+    function whatsappMe() { 
+        var t = (user && user.agente && user.agente.includes("ALEJANDRO")) ? "34618969208" : "34660050228"; 
+        window.open("https://wa.me/"+t); 
+    }
+
+    // BOTON YA ESTOY AQUI ARREGLADO
+    function notifyArrival() { 
+        var t = (user && user.agente && user.agente.includes("ALEJANDRO")) ? "34618969208" : "34660050228"; 
+        window.open("https://wa.me/"+t+"?text=Ya estoy en el concesionario para mi entrega."); 
+    }
+
     function sendWishlist() { 
-        var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228";
+        var t = (user && user.agente && user.agente.includes("ALEJANDRO")) ? "34618969208" : "34660050228";
         window.open("https://wa.me/"+t+"?text=Interés accesorio: " + document.getElementById('wishlist').value); 
     }
 </script>
