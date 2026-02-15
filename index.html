@@ -40,9 +40,9 @@
         .screen.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
 
-        .welcome-header { text-align: center; margin-top: 50px; margin-bottom: 30px; }
-        .welcome-header h1 { font-weight: 100; font-size: 26px; line-height: 1.2; }
-        .welcome-header h1 b { font-weight: 800; display: block; font-size: 32px; margin-top: 5px; }
+        .welcome-header { text-align: center; margin-top: 50px; margin-bottom: 30px; padding: 0 10px; }
+        .welcome-header h1 { font-weight: 100; font-size: clamp(22px, 6vw, 26px); line-height: 1.2; }
+        .welcome-header h1 b { font-weight: 800; display: block; font-size: clamp(28px, 8vw, 34px); margin-top: 5px; }
         .welcome-header p { font-size: 14px; opacity: 0.7; margin-top: 15px; font-weight: 300; }
 
         #s-splash { position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:9999; display:flex; justify-content:center; align-items:center; }
@@ -64,6 +64,7 @@
 
         .reveal-container { position: relative; width: 100%; height: 320px; border-radius: 35px; overflow: hidden; margin-bottom: 25px; background: radial-gradient(circle at center 80%, #2a4a70 0%, #000000 70%); border: 1px solid var(--glass-border); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; }
         .car-photo { width: 100%; height: auto; object-fit: contain; z-index: 3; transition: 1.2s ease-out; -webkit-box-reflect: below -25px linear-gradient(transparent, transparent 60%, rgba(255,255,255,0.15)); }
+        
         .blue-cover { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, #001e50 0%, #0044a0 50%, #001e50 100%); z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.8s ease; cursor: pointer; box-shadow: inset 0 0 100px rgba(0,0,0,0.5); }
         .blue-cover.open { transform: translateY(-110%) skewY(-5deg); opacity: 0; }
 
@@ -89,7 +90,7 @@
         .w-orange { color: #ff9800; } .w-red { color: #ff4444; } .w-blue { color: var(--vw-light); }
         
         .dealer-hero { width: 110%; height: 220px; margin-left: -5%; margin-top: -25px; margin-bottom: 25px; object-fit: cover; border-bottom-left-radius: 40px; border-bottom-right-radius: 40px; }
-        .pdf-viewer { width: 100%; height: 450px; border-radius: 25px; border: 1px solid var(--glass-border); background: white; margin-bottom: 15px; }
+        .pdf-viewer { width: 100%; height: 400px; border-radius: 20px; border: 1px solid var(--glass-border); background: white; margin-bottom: 15px; }
         .reset-btn { position: fixed; top: 15px; right: 15px; font-size: 10px; opacity: 0.5; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 20px; z-index: 10000; color: white; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); }
         #toast { visibility: hidden; min-width: 250px; background-color: white; color: black; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 9999; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 13px; font-weight: 600; opacity: 0; transition: 0.3s; }
         #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
@@ -98,15 +99,12 @@
 <body>
 
 <div class="app-container">
-    <div class="reset-btn" onclick="localStorage.clear(); location.reload();">RESET APP</div>
-    
-    <div id="s-splash">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" class="splash-logo">
-    </div>
+    <div class="reset-btn" onclick="localStorage.clear(); location.reload();">RESET</div>
+    <div id="s-splash"><img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" class="splash-logo"></div>
 
     <section id="s-welcome" class="screen">
         <div class="welcome-header">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="60" class="logo-white">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="60" class="logo-white" style="margin-bottom: 20px;">
             <h1>Bienvenido a <b>Castellana Wagen M-40</b></h1>
             <p>Tu herramienta digital de entrega personalizada.</p>
         </div>
@@ -141,18 +139,17 @@
         <div class="reveal-container" id="car-stage" onclick="reveal()">
             <div class="blue-cover" id="cover">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="45" class="logo-white" style="margin-bottom:10px;">
-                <h2 style="font-weight:200; margin:0;">TU NUEVO <span id="cover-car-name" style="font-weight:900;">VW</span></h2>
+                <h2 style="font-weight:200; margin:0; text-align:center;">TU NUEVO <span id="cover-car-name" style="font-weight:900;">VW</span></h2>
                 <div style="font-size:10px; opacity:0.8; margin-top:10px; letter-spacing:2px; font-weight:700;">TOCA PARA RETIRAR LA LONA</div>
             </div>
             <img id="real-car-img" class="car-photo" src="">
         </div>
-        <button class="btn-checkin" onclick="notifyArrival()"><i class="fas fa-map-marker-alt"></i> YA ESTOY AQUÍ</button>
         <div class="section-title">MENÚ PRINCIPAL</div>
         <div class="bento">
             <div class="tile wide" onclick="whatsappMe()">
                 <div style="display:flex; align-items:center; gap:15px;">
-                    <div id="agent-avatar" style="width:50px; height:50px; background:var(--vw-blue); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--vw-light); font-weight:bold;">VW</div>
-                    <div><div id="agent-name" style="font-size:16px; font-weight:bold;">Asesor</div><div style="font-size:12px; opacity:0.6;">Tu Asesor de Entregas</div></div>
+                    <div id="agent-avatar" style="width:50px; height:50px; background:var(--vw-blue); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--vw-light); font-weight:bold;">MA</div>
+                    <div><div id="agent-name" style="font-size:16px; font-weight:bold;">Manuel Arjona</div><div style="font-size:12px; opacity:0.6;">Tu Asesor de Entregas</div></div>
                 </div><i class="fab fa-whatsapp" style="color:#25D366; font-size:32px;"></i>
             </div>
             <div class="tile wide" style="background: linear-gradient(135deg, rgba(0, 30, 80, 0.9), rgba(0,0,0,0.5));" onclick="navTo('s-video')">
@@ -168,9 +165,6 @@
             <div style="color: #FFD700; font-size: 20px; margin: 10px 0;">★★★★★</div>
             <button class="review-btn" onclick="window.open('https://search.google.com/local/writereview?placeid=ChIJc6vL3fIvQg0RGT8iQzPAenc')">VALORAR EN GOOGLE</button>
         </div>
-        <div style="text-align:center; padding:40px 0; opacity:0.4; font-size:10px; letter-spacing:1px;">
-            Manuel Arjona Carrera © 2026<br>CASTELLANA WAGEN M-40
-        </div>
     </section>
 
     <section id="s-services" class="screen">
@@ -178,26 +172,20 @@
         <div onclick="window.open('tel:900100238')" style="background:rgba(255,68,68,0.1); padding:20px; border-radius:25px; display:flex; align-items:center; gap:15px; border:1px solid rgba(255,68,68,0.2); margin-bottom:15px;">
             <i class="fas fa-phone-alt" style="color:#ff4444; font-size:24px;"></i><div><div style="font-weight:bold;">Emergencia 24h</div><div style="font-size:12px; opacity:0.8;">900 100 238 (VW Service)</div></div>
         </div>
-        <div style="background:rgba(255,152,0,0.05); padding:15px; border-radius:15px; border:1px dashed var(--renting-alert); font-size:12px; color:#ccc; line-height:1.5; margin-bottom:25px;">
-            <i class="fas fa-info-circle" style="color:var(--renting-alert);"></i> <strong>Aviso Renting:</strong> Consulta si tu operador requiere llamar a su propio número de grúa.
-        </div>
         <div class="section-title">TESTIGOS DE ALERTA</div>
         <div class="grid-2">
             <div class="grid-item" onclick="showToast('Pare motor inmediatamente.')"><i class="fas fa-triangle-exclamation w-red"></i><span>Avería</span></div>
             <div class="grid-item" onclick="showToast('Revise nivel de aceite.')"><i class="fas fa-oil-can w-orange"></i><span>Aceite</span></div>
-            <div class="grid-item" onclick="showToast('Verifique presión neumáticos.')"><i class="fas fa-gauge-high w-orange"></i><span>Presión</span></div>
+            <div class="grid-item" onclick="showToast('Verifique neumáticos.')"><i class="fas fa-gauge-high w-orange"></i><span>Presión</span></div>
             <div class="grid-item" onclick="showToast('Rellene AdBlue (mínimo 5L).')"><i class="fas fa-gas-pump w-blue"></i><span>AdBlue</span></div>
         </div>
         <div class="section-title">FAQs</div>
         <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-head"><span>💧 ¿Cuándo echar AdBlue?</span><i class="fas fa-chevron-down"></i></div><div class="faq-body">El coche avisa con 2.400km de antelación. Rellena mínimo 5L. Si llega a 0km no arrancará.</div></div>
-        <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-head"><span>🔘 Resetear Neumáticos</span><i class="fas fa-chevron-down"></i></div><div class="faq-body">Tras inflar las ruedas, ve a la pantalla: Vehículo > Estado > Neumáticos > SET.</div></div>
-        <div class="section-title">TALLER Y POSVENTA</div>
+        <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-head"><span>🔘 Resetear Neumáticos</span><i class="fas fa-chevron-down"></i></div><div class="faq-body">Tras inflar, ve a la pantalla: Vehículo > Estado > Neumáticos > SET.</div></div>
+        <div class="section-title">TALLER</div>
         <div style="background:var(--glass); padding:20px; border-radius:25px; border:1px solid var(--glass-border);">
-            <div style="display:flex; align-items:center; gap:15px; margin-bottom:15px;"><div style="width:45px; height:45px; background:var(--vw-blue); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--vw-light); font-weight:bold;">AB</div><div><div style="font-weight:bold;">Álvaro Beltrán</div><div style="font-size:12px; opacity:0.6;">Cita Taller / Posventa</div></div></div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn-glow" style="flex:1; padding:10px; font-size:11px; background:rgba(255,255,255,0.05);" onclick="window.open('tel:648006146')">Llamar</button>
-                <button class="btn-glow" style="flex:1; padding:10px; font-size:11px; background:rgba(255,255,255,0.05);" onclick="window.open('mailto:alvaro.beltran@vwmadrid.es')">Email</button>
-            </div>
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:15px;"><div style="width:45px; height:45px; background:var(--vw-blue); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--vw-light); font-weight:bold;">AB</div><div><div style="font-weight:bold;">Álvaro Beltrán</div><div style="font-size:12px; opacity:0.6;">Posventa / Cita Taller</div></div></div>
+            <button class="btn-glow" style="padding:10px; font-size:11px;" onclick="window.open('tel:648006146')">LLAMAR ASESOR</button>
         </div>
     </section>
 
@@ -213,8 +201,7 @@
         <div class="checklist-group" style="border-color:rgba(255,152,0,0.2);">
             <div class="section-title" style="margin-top:0; color:var(--renting-alert);">AL ENTREGAR ANTIGUO (RENTING)</div>
             <div class="checklist-item" onclick="toggleCheck(this)"><div>2ª Llave y Papeles</div><div class="check-circle"><i class="fas fa-check"></i></div></div>
-            <div class="checklist-item" onclick="toggleCheck(this)"><div>Mando garaje / SD / Gafas</div><div class="check-circle"><i class="fas fa-check"></i></div></div>
-            <div class="checklist-item" onclick="toggleCheck(this)"><div>Fotos Estado (Seguridad)</div><div class="check-circle"><i class="fas fa-check"></i></div></div>
+            <div class="checklist-item" onclick="toggleCheck(this)"><div>Mando garaje / Gafas</div><div class="check-circle"><i class="fas fa-check"></i></div></div>
         </div>
         <button id="notifyBtn" class="btn-glow" onclick="notifyChecklist()">TODO LISTO PARA LA ENTREGA</button>
     </section>
@@ -225,35 +212,26 @@
         <div class="grid-2" style="margin-bottom:20px;">
             <div class="grid-item"><i class="fas fa-charging-station w-blue"></i><span>Cables</span></div>
             <div class="grid-item"><i class="fas fa-shoe-prints" style="color:#aaa;"></i><span>Alfombrillas</span></div>
-            <div class="grid-item"><i class="fas fa-suitcase" style="color:#aaa;"></i><span>Maletero</span></div>
-            <div class="grid-item"><i class="fas fa-bicycle" style="color:#aaa;"></i><span>Portabicis</span></div>
         </div>
         <iframe src="https://docs.google.com/viewer?url=https://raw.githubusercontent.com/vwmadrid/Entregas/main/catalogo.pdf&embedded=true" class="pdf-viewer"></iframe>
-        <textarea id="wishlist" style="width:100%; margin-top:10px; background:var(--glass); color:white; border-radius:15px; padding:15px; border:1px solid var(--glass-border); outline:none;" placeholder="¿Buscas algún accesorio específico?"></textarea>
+        <button class="btn-glow" style="background:var(--vw-blue); border:1px solid var(--vw-light); margin-bottom:20px;" onclick="window.open('https://raw.githubusercontent.com/vwmadrid/Entregas/main/catalogo.pdf')"><i class="fas fa-file-pdf"></i> ABRIR CATÁLOGO EN PDF</button>
+        <textarea id="wishlist" style="width:100%; background:var(--glass); color:white; border-radius:15px; padding:15px; border:1px solid var(--glass-border); outline:none;" placeholder="¿Buscas algún accesorio específico? Escribe aquí..."></textarea>
         <button class="btn-glow" style="background:#25D366; margin-top:15px;" onclick="sendWishlist()">CONSULTAR POR WHATSAPP</button>
     </section>
 
     <section id="s-dealership" class="screen" style="padding-top:0;">
-        <div class="dealer-hero"><img src="https://raw.githubusercontent.com/vwmadrid/Entregas/main/images/concesionario.jpg" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/400x200/001E50/FFFFFF?text=Castellana+Wagen';"><i class="fas fa-arrow-left" onclick="navTo('s-dash')" style="position:absolute; top:30px; left:25px; font-size:22px; color:white; text-shadow:0 2px 10px black;"></i></div>
+        <div class="dealer-hero"><img src="https://raw.githubusercontent.com/vwmadrid/Entregas/main/images/concesionario.jpg" style="width:100%; height:100%; object-fit:cover;"><i class="fas fa-arrow-left" onclick="navTo('s-dash')" style="position:absolute; top:30px; left:25px; font-size:22px; color:white; text-shadow:0 2px 10px black;"></i></div>
         <div style="padding:0 15px; text-align:center;">
-            <h3 style="font-size:28px; margin:0 0 5px 0;">Castellana Wagen M-40</h3>
+            <h3>Castellana Wagen M-40</h3>
             <p style="opacity:0.7; font-size:14px; margin-bottom:25px;">Calle de Sofía, 18, 28022 Madrid</p>
             <div class="tile wide" style="margin-bottom:10px;" onclick="window.open('tel:913136450')"><div style="display:flex; align-items:center; gap:15px;"><i class="fas fa-phone"></i><span>913 13 64 50</span></div></div>
-            <div class="tile wide" style="margin-bottom:25px;" onclick="window.open('https://www.volkswagenmadrid.es')"><div style="display:flex; align-items:center; gap:15px;"><i class="fas fa-globe"></i><span>volkswagenmadrid.es</span></div></div>
-            <button class="btn-glow" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=Castellana+Wagen+M40')">🚀 CÓMO LLEGAR (GPS)</button>
+            <button class="btn-glow" onclick="window.open('https://www.google.com/maps/dir//Castellana+Wagen+M40+-+Concesionario+Oficial+Volkswagen,+C.+de+Sof%C3%ADa,+18,+28022+Madrid/@40.4312453,-3.6811239,12z/data=!4m8!4m7!1m0!1m5!1m1!1s0xd422ff2ddcbab73:0x777ac03343223f19!2m2!1d-3.5987232!2d40.4312746?entry=ttu')">🚀 CÓMO LLEGAR (GPS)</button>
         </div>
     </section>
 
     <section id="s-video" class="screen">
         <div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;"><i class="fas fa-arrow-left" onclick="navTo('s-dash')"></i><span style="font-weight:800; font-size:18px;">TU COCHE</span></div>
         <iframe id="video-frame" width="100%" height="220" src="" frameborder="0" allowfullscreen style="border-radius:25px; border:1px solid var(--glass-border);"></iframe>
-        <div class="section-title">TECNOLOGÍA A BORDO</div>
-        <div class="grid-2">
-            <div class="grid-item" onclick="showToast('Cuadro digital 100% personalizable.')"><i class="fas fa-tachometer-alt" style="color:var(--vw-light);"></i><span>Cockpit</span></div>
-            <div class="grid-item" onclick="showToast('Conecta tu móvil inalámbricamente.')"><i class="fab fa-bluetooth-b" style="color:var(--vw-light);"></i><span>App Connect</span></div>
-            <div class="grid-item" onclick="showToast('Asistentes de conducción activa.')"><i class="fas fa-shield-alt" style="color:var(--vw-light);"></i><span>IQ.Drive</span></div>
-            <div class="grid-item" onclick="showToast('El coche aparca solo por ti.')"><i class="fas fa-parking" style="color:var(--vw-light);"></i><span>Park Assist</span></div>
-        </div>
         <button class="btn-glow" style="margin-top:20px; background:rgba(255,255,255,0.1); border:1px solid #444;" onclick="window.open('https://www.volkswagen.es/es/clientes/informacion-sobre-tu-coche/manuales.html')">📚 MANUAL DIGITAL OFICIAL</button>
     </section>
 
@@ -281,7 +259,7 @@
     };
 
     window.onload = function() {
-        if(!localStorage.getItem('app_final_fixed_v9')) { localStorage.clear(); localStorage.setItem('app_final_fixed_v9', 'true'); }
+        if(!localStorage.getItem('app_fixed_v11')) { localStorage.clear(); localStorage.setItem('app_fixed_v11', 'true'); }
         setTimeout(() => document.getElementById('s-splash').style.display = 'none', 2000);
         const saved = localStorage.getItem('vw_user_data');
         if(saved) { user = JSON.parse(saved); loadDash(); } else { navTo('s-welcome'); }
@@ -364,8 +342,10 @@
     }
 
     function whatsappMe() { var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228"; window.open("https://wa.me/"+t); }
-    function notifyArrival() { var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228"; window.open("https://wa.me/"+t+"?text=Ya estoy aquí."); }
-    function sendWishlist() { window.open("https://wa.me/34660050228?text=Interés accesorio: " + document.getElementById('wishlist').value); }
+    function sendWishlist() { 
+        var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228";
+        window.open("https://wa.me/"+t+"?text=Interés accesorio: " + document.getElementById('wishlist').value); 
+    }
 </script>
 </body>
 </html>
