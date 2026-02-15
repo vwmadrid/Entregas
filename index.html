@@ -64,7 +64,6 @@
 
         .reveal-container { position: relative; width: 100%; height: 320px; border-radius: 35px; overflow: hidden; margin-bottom: 25px; background: radial-gradient(circle at center 80%, #2a4a70 0%, #000000 70%); border: 1px solid var(--glass-border); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; }
         .car-photo { width: 100%; height: auto; object-fit: contain; z-index: 3; transition: 1.2s ease-out; -webkit-box-reflect: below -25px linear-gradient(transparent, transparent 60%, rgba(255,255,255,0.15)); }
-        
         .blue-cover { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, #001e50 0%, #0044a0 50%, #001e50 100%); z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.8s ease; cursor: pointer; box-shadow: inset 0 0 100px rgba(0,0,0,0.5); }
         .blue-cover.open { transform: translateY(-110%) skewY(-5deg); opacity: 0; }
 
@@ -112,7 +111,7 @@
             <p>Tu herramienta digital de entrega personalizada.</p>
         </div>
         <div style="background:var(--glass); padding:30px; border-radius:30px; border:1px solid var(--glass-border); margin-top:20px;">
-            <button class="btn-glow" onclick="window.open('https://outlook.office.com/book/EntregasVWMadrid@porscheholding.onmicrosoft.com/');">📅 RESERVAR CITA ENTREGA</button>
+            <button class="btn-glow" onclick="window.open('https://outlook.office.com/book/EntregasVWMadrid@porscheholding.onmicrosoft.com/'); navTo('s-login')">📅 RESERVAR CITA ENTREGA</button>
             <button class="btn-glow" style="background:transparent; border:1px solid white; margin-top:15px;" onclick="navTo('s-login')">YA TENGO MI CITA</button>
         </div>
     </section>
@@ -153,7 +152,7 @@
             <div class="tile wide" onclick="whatsappMe()">
                 <div style="display:flex; align-items:center; gap:15px;">
                     <div id="agent-avatar" style="width:50px; height:50px; background:var(--vw-blue); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--vw-light); font-weight:bold;">VW</div>
-                    <div><div id="agent-name" style="font-size:16px; font-weight:bold;">Manuel Arjona</div><div style="font-size:12px; opacity:0.6;">Tu Asesor de Entregas</div></div>
+                    <div><div id="agent-name" style="font-size:16px; font-weight:bold;">Asesor</div><div style="font-size:12px; opacity:0.6;">Tu Asesor de Entregas</div></div>
                 </div><i class="fab fa-whatsapp" style="color:#25D366; font-size:32px;"></i>
             </div>
             <div class="tile wide" style="background: linear-gradient(135deg, rgba(0, 30, 80, 0.9), rgba(0,0,0,0.5));" onclick="navTo('s-video')">
@@ -191,9 +190,10 @@
         </div>
         <div class="section-title">FAQs</div>
         <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-head"><span>💧 ¿Cuándo echar AdBlue?</span><i class="fas fa-chevron-down"></i></div><div class="faq-body">El coche avisa con 2.400km de antelación. Rellena mínimo 5L. Si llega a 0km no arrancará.</div></div>
-        <div class="section-title">TALLER</div>
+        <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-head"><span>🔘 Resetear Neumáticos</span><i class="fas fa-chevron-down"></i></div><div class="faq-body">Tras inflar las ruedas, ve a la pantalla: Vehículo > Estado > Neumáticos > SET.</div></div>
+        <div class="section-title">TALLER Y POSVENTA</div>
         <div style="background:var(--glass); padding:20px; border-radius:25px; border:1px solid var(--glass-border);">
-            <div style="display:flex; align-items:center; gap:15px;"><div style="width:45px; height:45px; background:var(--vw-blue); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--vw-light); font-weight:bold;">AB</div><div><div style="font-weight:bold;">Álvaro Beltrán</div><div style="font-size:12px; opacity:0.6;">Cita Taller / Posventa</div></div></div>
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:15px;"><div style="width:45px; height:45px; background:var(--vw-blue); border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid var(--vw-light); font-weight:bold;">AB</div><div><div style="font-weight:bold;">Álvaro Beltrán</div><div style="font-size:12px; opacity:0.6;">Cita Taller / Posventa</div></div></div>
             <div style="display:flex; gap:10px;">
                 <button class="btn-glow" style="flex:1; padding:10px; font-size:11px; background:rgba(255,255,255,0.05);" onclick="window.open('tel:648006146')">Llamar</button>
                 <button class="btn-glow" style="flex:1; padding:10px; font-size:11px; background:rgba(255,255,255,0.05);" onclick="window.open('mailto:alvaro.beltran@vwmadrid.es')">Email</button>
@@ -240,7 +240,7 @@
             <p style="opacity:0.7; font-size:14px; margin-bottom:25px;">Calle de Sofía, 18, 28022 Madrid</p>
             <div class="tile wide" style="margin-bottom:10px;" onclick="window.open('tel:913136450')"><div style="display:flex; align-items:center; gap:15px;"><i class="fas fa-phone"></i><span>913 13 64 50</span></div></div>
             <div class="tile wide" style="margin-bottom:25px;" onclick="window.open('https://www.volkswagenmadrid.es')"><div style="display:flex; align-items:center; gap:15px;"><i class="fas fa-globe"></i><span>volkswagenmadrid.es</span></div></div>
-            <button class="btn-glow" onclick="window.open('https://www.google.com/maps/dir//Castellana+Wagen+M40+-+Concesionario+Oficial+Volkswagen,+C.+de+Sof%C3%ADa,+18,+28022+Madrid')">🚀 CÓMO LLEGAR (GPS)</button>
+            <button class="btn-glow" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=Castellana+Wagen+M40')">🚀 CÓMO LLEGAR (GPS)</button>
         </div>
     </section>
 
@@ -249,7 +249,7 @@
         <iframe id="video-frame" width="100%" height="220" src="" frameborder="0" allowfullscreen style="border-radius:25px; border:1px solid var(--glass-border);"></iframe>
         <div class="section-title">TECNOLOGÍA A BORDO</div>
         <div class="grid-2">
-            <div class="grid-item" onclick="showToast('Cuadro digital personalizable.')"><i class="fas fa-tachometer-alt" style="color:var(--vw-light);"></i><span>Cockpit</span></div>
+            <div class="grid-item" onclick="showToast('Cuadro digital 100% personalizable.')"><i class="fas fa-tachometer-alt" style="color:var(--vw-light);"></i><span>Cockpit</span></div>
             <div class="grid-item" onclick="showToast('Conecta tu móvil inalámbricamente.')"><i class="fab fa-bluetooth-b" style="color:var(--vw-light);"></i><span>App Connect</span></div>
             <div class="grid-item" onclick="showToast('Asistentes de conducción activa.')"><i class="fas fa-shield-alt" style="color:var(--vw-light);"></i><span>IQ.Drive</span></div>
             <div class="grid-item" onclick="showToast('El coche aparca solo por ti.')"><i class="fas fa-parking" style="color:var(--vw-light);"></i><span>Park Assist</span></div>
@@ -268,13 +268,20 @@
     ];
 
     let user = null;
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showToast("Pulsa aquí para instalar como App", 5000);
+    });
 
     window.onpopstate = function() {
         if (user) { navTo('s-dash'); } else { navTo('s-welcome'); }
     };
 
     window.onload = function() {
-        if(!localStorage.getItem('app_fixed_v7')) { localStorage.clear(); localStorage.setItem('app_fixed_v7', 'true'); }
+        if(!localStorage.getItem('app_final_fixed_v9')) { localStorage.clear(); localStorage.setItem('app_final_fixed_v9', 'true'); }
         setTimeout(() => document.getElementById('s-splash').style.display = 'none', 2000);
         const saved = localStorage.getItem('vw_user_data');
         if(saved) { user = JSON.parse(saved); loadDash(); } else { navTo('s-welcome'); }
@@ -346,7 +353,7 @@
     }
     
     function toggleCheck(e) { e.classList.toggle('checked'); }
-    function showToast(t) { var x = document.getElementById("toast"); x.className = "show"; x.innerText = t; setTimeout(()=>x.className="", 3000); }
+    function showToast(t, time = 3000) { var x = document.getElementById("toast"); x.className = "show"; x.innerText = t; setTimeout(()=>x.className="", time); }
     
     function notifyChecklist() { 
         const btn = document.getElementById('notifyBtn');
@@ -357,6 +364,7 @@
     }
 
     function whatsappMe() { var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228"; window.open("https://wa.me/"+t); }
+    function notifyArrival() { var t = user.agente.includes("ALEJANDRO") ? "34618969208" : "34660050228"; window.open("https://wa.me/"+t+"?text=Ya estoy aquí."); }
     function sendWishlist() { window.open("https://wa.me/34660050228?text=Interés accesorio: " + document.getElementById('wishlist').value); }
 </script>
 </body>
