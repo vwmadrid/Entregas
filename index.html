@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Castellana Wagen M-40 | Volkswagen</title>
     
-    <meta name="author" content="Manuel Arjona & Miriam">
-    <meta name="copyright" content="© 2026 Manuel Arjona & Miriam. Todos los derechos reservados.">
+    <meta name="author" content="Manuel Arjona Carrera & Miriam Olmo Fernández">
+    <meta name="copyright" content="© 2026 Manuel Arjona Carrera & Miriam Olmo Fernández. Todos los derechos reservados.">
     <meta name="application-name" content="GesCar OS / M2 Code Systems">
 
     <link rel="manifest" href="manifest.json">
@@ -21,188 +21,157 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
 
     <script type="module">
-        /**
-         * 🔥 CABECERA DE PROPIEDAD INTELECTUAL 🔥
-         * @project GesCar OS - Lógica de Cliente
-         */
-    
-    // 🔥 AQUÍ ESTÁ EL ESCUDO QUE FALTABA PARA QUE NO TE EXPULSE 🔥
-    window.escapeJS = function(str) {
-        return String(str || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
-    };
-
-    // Conexión directa a Firebase Firestore desde el frontend.
-    // Ya no usamos backend proxy; GitHub Pages sirve el HTML estático.
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, doc, query, where, getDocs, getDoc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyCRfERugbIVfAXtKa7mGdLLTm6xwxb5wlE",
-        authDomain: "gestion-flotas-vw.firebaseapp.com",
-        projectId: "gestion-flotas-vw"
-    };
-
-    window.API_BASE = '';
-    const originalFetch = window.fetch.bind(window);
-
-    async function jsonResponse(data, status = 200) {
-        return new Response(JSON.stringify(data), {
-            status,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-
-    async function handleApiRequest(path, method, body) {
-        const cleanPath = path.replace(/\/api\//, '');
-        const parts = cleanPath.split('/');
-
-        const collectionName = parts[0];
-        const action = parts[1];
-
-        const colRef = collection(window.db, collectionName);
-
-        const normalize = (value) => String(value || '').toUpperCase().trim();
-
-        if (collectionName === 'vehiculos' && action === 'all' && method === 'GET') {
-            const snap = await getDocs(colRef);
-            const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            return jsonResponse({ results });
-        }
-
-        if (collectionName === 'vehiculos' && action === 'buscar' && method === 'POST') {
-            const q = normalize(body && body.q);
-            const snap = await getDocs(query(colRef, where('matricula', '==', q)));
-            let results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            if (!results.length) {
-                const snap2 = await getDocs(query(colRef, where('bastidor', '==', q)));
-                results = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Reemplazo de Firestore en frontend por llamadas al backend (proxy)
+        // Uso Firebase Auth únicamente para obtener ID tokens y delegar las operaciones al backend.
+        
+        // 🌍 Detectar automáticamente el entorno (desarrollo vs producción)
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isLocalServer = isDev && window.location.port === '5500'; // Live Server Port
+        
+        if (isLocalServer) {
+            // 💻 Desarrollo local: conectar al backend en localhost:3000
+            window.API_BASE = 'http://localhost:3000';
+        } else if (isDev) {
+            // 💻 Desarrollo (otro puerto): intentar localhost:3000
+            window.API_BASE = 'http://localhost:3000';
+        } else {
+            // 🚀 Producción: si el frontend está en Vercel, usa el mismo origen para el backend.
+            if (window.location.hostname.endsWith('.vercel.app')) {
+                window.API_BASE = window.location.origin;
+            } else {
+                window.API_BASE = 'https://gescar-backend.vercel.app';
             }
-            return jsonResponse({ results });
         }
+        
+        console.log('🌍 Entorno:', isDev ? 'DESARROLLO' : 'PRODUCCIÓN');
+        console.log('📍 API Base:', window.API_BASE);
 
-        if (collectionName === 'citas_agenda' && action === 'buscar' && method === 'POST') {
-            const matricula = normalize(body && body.matricula);
-            const snap = await getDocs(query(colRef, where('matricula', '==', matricula)));
-            const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            return jsonResponse({ results });
-        }
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-        if (collectionName === 'citas_agenda' && action === 'query' && method === 'POST') {
-            const field = String(body.field || '');
-            const value = body.value;
-            if (!field) return jsonResponse({ error: 'missing_field' }, 400);
-            const snap = await getDocs(query(colRef, where(field, '==', value)));
-            const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            return jsonResponse({ results });
-        }
-
-        if (collectionName === 'vehiculos' && action === 'update' && method === 'POST') {
-            const id = String(body.id || '');
-            const data = body.data || {};
-            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
-            const docRef = doc(colRef, id);
-            await updateDoc(docRef, data);
-            return jsonResponse({ ok: true });
-        }
-
-        if (collectionName === 'citas_agenda' && action === 'set' && method === 'POST') {
-            const id = String(body.id || '');
-            const data = body.data || {};
-            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
-            const docRef = doc(colRef, id);
-            await setDoc(docRef, data, { merge: true });
-            return jsonResponse({ ok: true });
-        }
-
-        if (collectionName === 'citas_agenda' && action === 'create' && method === 'POST') {
-            const data = body.data || {};
-            const safe = {};
-            ['matricula', 'phone', 'date', 'time', 'notes', 'status', 'vehicleId'].forEach(key => {
-                if (key in data) safe[key] = data[key];
-            });
-            safe.owner = (window.firebaseAuthUser && window.firebaseAuthUser.uid) || null;
-            const ref = await addDoc(colRef, safe);
-            return jsonResponse({ ok: true, id: ref.id });
-        }
-
-        if (collectionName === 'citas_agenda' && action === 'delete' && method === 'POST') {
-            const id = String(body.id || '');
-            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
-            const docRef = doc(colRef, id);
-            await deleteDoc(docRef);
-            return jsonResponse({ ok: true });
-        }
-
-        if (collectionName === 'citas_agenda' && action === 'arrivar' && method === 'POST') {
-            const id = String(body.id || '');
-            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
-            const docRef = doc(colRef, id);
-            await updateDoc(docRef, { status: 'arrived', arrivedAt: serverTimestamp() });
-            return jsonResponse({ ok: true });
-        }
-
-        if (collectionName === 'feedback' && action === 'create' && method === 'POST') {
-            const id = body.id ? String(body.id) : null;
-            const data = body.data || {};
-            if (id) {
-                await setDoc(doc(colRef, id), data);
-                return jsonResponse({ ok: true, id });
-            }
-            const ref = await addDoc(colRef, data);
-            return jsonResponse({ ok: true, id: ref.id });
-        }
-
-        return jsonResponse({ error: 'not_found' }, 404);
-    }
-
-    window.fetch = async function(input, init = {}) {
-        let url = typeof input === 'string' ? input : input.url;
-        const method = (init.method || 'GET').toUpperCase();
-        if (typeof input !== 'string' && input instanceof Request) {
-            url = input.url;
-        }
-        const parsed = new URL(url, window.location.origin);
-        if (parsed.pathname.startsWith('/api/')) {
-            const body = init.body ? JSON.parse(init.body) : null;
-            return handleApiRequest(parsed.pathname, method, body);
-        }
-        return originalFetch(input, init);
-    };
-
-    try {
-        const _app = initializeApp(firebaseConfig);
-        const _auth = getAuth(_app);
-        window.db = getFirestore(_app);
-
-        onAuthStateChanged(_auth, (u) => {
-            window.firebaseAuthUser = u || null;
-            if (!u) {
-                try { signInAnonymously(_auth).catch(e=>console.error('Anon signIn failed', e)); } catch(e){}
-            }
-        });
-        window.getIdToken = async function() {
-            try {
-                if (!_auth.currentUser) await signInAnonymously(_auth);
-                const user = _auth.currentUser;
-                if (!user) return null;
-                return await user.getIdToken();
-            } catch (e) { console.error('getIdToken error', e); return null; }
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRfERugbIVfAXtKa7mGdLLTm6xwxb5wlE",
+            authDomain: "gestion-flotas-vw.firebaseapp.com",
+            projectId: "gestion-flotas-vw"
         };
 
-        window.collection = collection;
-        window.doc = doc;
-        window.where = where;
-        window.query = query;
-        window.getDocs = getDocs;
-        window.getDoc = getDoc;
-        window.setDoc = setDoc;
-        window.updateDoc = updateDoc;
-        window.deleteDoc = deleteDoc;
-        window.addDoc = addDoc;
-        window.onSnapshot = onSnapshot;
-    } catch (e) { console.error('Firebase Auth init failed', e); }
+        try {
+            const _app = initializeApp(firebaseConfig);
+            const _auth = getAuth(_app);
+            onAuthStateChanged(_auth, (u) => {
+                if (!u) {
+                    try { signInAnonymously(_auth).catch(e=>console.error('Anon signIn failed', e)); } catch(e){}
+                }
+            });
+            window.getIdToken = async function() {
+                try {
+                    if (!_auth.currentUser) await signInAnonymously(_auth);
+                    const user = _auth.currentUser;
+                    if (!user) return null;
+                    return await user.getIdToken();
+                } catch (e) { console.error('getIdToken error', e); return null; }
+            };
+        } catch (e) { console.error('Firebase Auth init failed', e); }
+
+        // Helper para llamadas al backend con token
+        async function sendApi(path, method='POST', body=null) {
+            const headers = { 'Content-Type': 'application/json' };
+            const token = (window.getIdToken) ? await window.getIdToken() : null;
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const opts = { method, headers };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch(window.API_BASE + path, opts);
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('application/json')) return res.json();
+            return res.text();
+        }
+
+        // Shims compatibles con el código existente que usaba la API de Firestore
+        window.collection = function(_db, name) { return { __collection: name }; };
+        window.doc = function(_db, coll, id) {
+            // soporta doc(window.db, 'vehiculos', id) o doc(window.db, 'vehiculos')
+            if (id === undefined) return { __collection: coll, __id: null };
+            return { __collection: coll, __id: id };
+        };
+        window.where = function(field, op, value) { return { __where: { field, op, value } }; };
+        window.query = function(collectionObj, whereObj) { return { __collection: collectionObj && collectionObj.__collection, __where: whereObj && whereObj.__where }; };
+
+        window.getDocs = async function(q) {
+            if (!q || !q.__collection) return { empty: true, docs: [], forEach: () => {} };
+            if (q.__collection === 'vehiculos') {
+                if (q.__where && (q.__where.field === 'matricula' || q.__where.field === 'bastidor')) {
+                    const resp = await sendApi('/api/vehiculos/buscar', 'POST', { q: q.__where.value });
+                    const results = resp.results || [];
+                    const docs = results.map(r => ({ id: r.id, data: () => r }));
+                    return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
+                }
+                const resp = await sendApi('/api/vehiculos/all', 'GET');
+                const results = resp.results || [];
+                const docs = results.map(r => ({ id: r.id, data: () => r }));
+                return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
+            }
+            if (q.__collection === 'citas_agenda') {
+                if (q.__where) {
+                    const resp = await sendApi('/api/citas/query', 'POST', { field: q.__where.field, value: q.__where.value });
+                    const results = resp.results || [];
+                    const docs = results.map(r => ({ id: r.id, data: () => r }));
+                    return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
+                }
+            }
+            return { empty: true, docs: [], forEach: () => {} };
+        };
+
+        window.setDoc = async function(docRef, data) {
+            if (!docRef || !docRef.__collection) return null;
+            if (docRef.__collection === 'app_feedback') {
+                if (docRef.__id) return sendApi('/api/feedback/create', 'POST', { id: docRef.__id, data });
+                return sendApi('/api/feedback/create', 'POST', { data });
+            }
+            if (docRef.__collection === 'citas_agenda') {
+                return sendApi('/api/citas/set', 'POST', { id: docRef.__id, data });
+            }
+            return sendApi(`/api/${docRef.__collection}/set`, 'POST', { id: docRef.__id, data });
+        };
+
+        window.updateDoc = async function(docRef, data) {
+            if (!docRef || !docRef.__collection) return null;
+            if (docRef.__collection === 'vehiculos') return sendApi('/api/vehiculos/update', 'POST', { id: docRef.__id, data });
+            if (docRef.__collection === 'citas_agenda') return sendApi('/api/citas/update', 'POST', { id: docRef.__id, data });
+            return sendApi(`/api/${docRef.__collection}/update`, 'POST', { id: docRef.__id, data });
+        };
+
+        window.deleteDoc = async function(docRef) {
+            if (!docRef || !docRef.__collection) return null;
+            if (docRef.__collection === 'citas_agenda') return sendApi('/api/citas/delete', 'POST', { id: docRef.__id });
+            return sendApi(`/api/${docRef.__collection}/delete`, 'POST', { id: docRef.__id });
+        };
+
+        // onSnapshot: implementa polling sencillo en desarrollo (dev only)
+        window.onSnapshot = function(target, onNext, onError) {
+            let stopped = false;
+            const poll = async () => {
+                try {
+                    if (stopped) return;
+                    if (target && target.__id) {
+                        // buscar documento por id en la colección (fallback usando /all)
+                        const resp = await sendApi(`/api/${target.__collection}/all`, 'GET');
+                        const doc = (resp.results || []).find(r => r.id === target.__id);
+                        const docs = doc ? [{ id: doc.id, data: () => doc }] : [];
+                        onNext({ empty: docs.length === 0, docs });
+                    } else {
+                        const snap = await window.getDocs(target);
+                        onNext(snap);
+                    }
+                } catch (e) {
+                    if (onError) onError(e);
+                }
+                if (!stopped) setTimeout(poll, 3000);
+            };
+            poll();
+            return () => { stopped = true; };
+        };
     </script>
+
     <style>
         :root {
             --vw-blue: #001E50; --vw-light: #00B0F0; --glass: rgba(15, 25, 45, 0.6);
@@ -265,7 +234,6 @@
         .tile i.premium-icon {
             font-size: 26px;
             background: -webkit-linear-gradient(45deg, #00B0F0, #ffffff);
-            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 15px;
@@ -779,6 +747,23 @@
     /**
      * @project GesCar OS - Lógica de Cliente
      */
+    const API_URL = "https://script.google.com/macros/s/AKfycbxQ5mMCC7DA0wrlpaZS6EksUAIkoDgwceIcFObevEXei8mzEw1WVfOzgKdrqBIi76p-CQ/exec";
+
+    window.escapeJS = function(str) {
+        return String(str || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    };
+
+    function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function escapeForJsString(str) {
+        return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function esVideoValido(id) {
+        return !!(id && id !== 'ID_AQUI' && /^[a-zA-Z0-9_-]{11}$/.test(id));
+    }
     
     const videoDictionary = {
         "POLO": [ { id: "bxk6-Y1IYqI", title: "Presentación" } ],
@@ -787,11 +772,13 @@
         "PASSAT": [ { id: "xg5yWdxLjnQ", title: "Presentación" } ],
         "TIGUAN": [ { id: "UOqeK51kriw", title: "Presentación" } ],
         "TAYRON": [ { id: "A-12YvB_kdg", title: "Presentación" } ],
+        "TROC": [ { id: "s2OTyfxNcWY", title: "Presentación" } ],
         "TOUAREG": [ { id: "azQz9t26XPU", title: "Presentación" }, { id: "npcvuUCBo1U", title: "Suspensión neumática" } ],
-        "TAIGO": [ { id: "ID_AQUI", title: "Presentación" } ],
-        "CADDY": [ { id: "ID_AQUI", title: "Presentación" } ],
-        "MULTIVAN": [ { id: "ID_AQUI", title: "Presentación" } ],
-        "CRAFTER": [ { id: "ID_AQUI", title: "Presentación" } ],
+        "TAIGO": [ { id: "V_ySP0h4G5o", title: "Presentación" } ],
+        "CADDY": [ { id: "uJZhDE0BTHM", title: "Presentación" } ],
+        "MULTIVAN": [ { id: "7sfAIGUnnas", title: "Presentación" } ],
+        "CRAFTER": [ { id: "RP_QlToJxvM", title: "Presentación" } ],
+        "TRANSPORTER": [ { id: "7sfAIGUnnas", title: "Presentación" } ],
         "IDBUZZ": [ { id: "1VOEbyTnlnA", title: "Volante" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" } ],
         "ID3": [ { id: "oFA1YxoDbJo", title: "Presentación" }, { id: "1VOEbyTnlnA", title: "Volante" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" }, { id: "S3SreCeLKRo", title: "I.D Light" }, { id: "hyt0zJ1xDx0", title: "Side Assist" } ],
         "ID4": [ { id: "ucX88AZTWwM", title: "Presentación" }, { id: "GEqyViG2zVo", title: "Interior" }, { id: "1VOEbyTnlnA", title: "Volante" }, { id: "WNvKN_z8Bc0", title: "Pantalla" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" }, { id: "V9yGN6fSPvU", title: "Programar cargas" }, { id: "JXrs7-ZyZbo", title: "Encendido auto" }, { id: "S3SreCeLKRo", title: "I.D Light" }, { id: "hyt0zJ1xDx0", title: "Side Assist" } ],
@@ -815,6 +802,24 @@
         { id: "JUVxojdu4CE", title: "Travel Assist" }, 
         { id: "_Oy5TkGj5E0", title: "Ángulo muerto" }
     ];
+
+    function resolverVideoId(vid) {
+        return esVideoValido(vid) ? vid : generalVideos[0].id;
+    }
+
+    function htmlTarjetaVideo(v) {
+        if (!esVideoValido(v.id)) return '';
+        const id = escapeForJsString(v.id);
+        const titleJs = escapeForJsString(v.title);
+        const titleHtml = escapeHtml(v.title);
+        return `
+                    <div class="video-mini-card" onclick="playQuickVideo('${id}', '${titleJs}')">
+                        <div class="thumb" style="background: url('https://img.youtube.com/vi/${v.id}/0.jpg');">
+                            <div class="thumb-overlay"><i class="fas fa-play"></i></div>
+                        </div>
+                        <p style="font-size: 11px; text-align: center; margin-top: 8px; font-weight: 600; color: white;">${titleHtml}</p>
+                    </div>`;
+    }
     
     const cars = [
        {name: "Golf", file: "Golf.png", vid: "_KGEUPY1_L4"}, 
@@ -827,11 +832,11 @@
        {name: "T-Roc", file: "T-Roc.png", vid: "s2OTyfxNcWY"},
        {name: "TRoc", file: "T-Roc.png", vid: "s2OTyfxNcWY"},
        {name: "Touareg", file: "Touareg.png", vid: "azQz9t26XPU"},
-       {name: "Taigo", file: "Taigo.png", vid: "ID_AQUI"},
-       {name: "Caddy", file: "Caddy.png", vid: "ID_AQUI"},
-       {name: "Multivan", file: "Multivan.png", vid: "ID_AQUI"},
-       {name: "Crafter", file: "Crafter.png", vid: "ID_AQUI"},
-       {name: "Transporter", file: "Transporter.png", vid: "ID_AQUI"},
+       {name: "Taigo", file: "Taigo.png", vid: "V_ySP0h4G5o"},
+       {name: "Caddy", file: "Caddy.png", vid: "uJZhDE0BTHM"},
+       {name: "Multivan", file: "Multivan.png", vid: "7sfAIGUnnas"},
+       {name: "Crafter", file: "Crafter.png", vid: "RP_QlToJxvM"},
+       {name: "Transporter", file: "Transporter.png", vid: "7sfAIGUnnas"},
        {name: "ID.3", file: "ID.3.png", vid: "oFA1YxoDbJo"},
        {name: "ID3", file: "ID.3.png", vid: "oFA1YxoDbJo"},
        {name: "ID.4", file: "ID.4.png", vid: "ucX88AZTWwM"},
@@ -875,10 +880,10 @@
         if (editar === "true" && matricula) {
             window.modoEdicion = true;
 
-            window.apiBuscarCitas(matricula)
-            .then(resp => {
-                if (resp && resp.results && resp.results.length) {
-                    let docData = resp.results[0];
+            window.getDocs(window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", matricula)))
+            .then(snapshot => {
+                if (!snapshot.empty) {
+                    let docData = snapshot.docs[0].data();
                     window.datosEdicion = docData; 
 
                     let cocheParaReagendar = {
@@ -912,7 +917,200 @@
         verificarSesionLocal();
     };
 
-    function verificarSesionLocal() {
+    function parseFechaCita(fechaCita) {
+        if (!fechaCita || !String(fechaCita).trim()) return null;
+        const partes = String(fechaCita).split(' - ');
+        if (partes.length !== 2) return null;
+        const f = partes[0].split('/');
+        const h = partes[1].replace('h', '').trim();
+        if (f.length !== 3 || !h) return null;
+        return `${f[2]}-${f[1]}-${f[0]}T${h}:00`;
+    }
+
+    async function buscarVehiculoEnFirebase(identificador) {
+        const mat = String(identificador).toUpperCase().replace(/\s/g, '');
+        const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
+        let resultado = null;
+        querySnapshot.forEach((docSnap) => {
+            const c = docSnap.data();
+            const matDB = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
+            const basDB = (c.bastidor || "").toUpperCase();
+            if (matDB === mat || basDB === mat) {
+                resultado = { data: c, id: docSnap.id };
+            }
+        });
+        return resultado;
+    }
+
+    function buildUserFromVehiculo(cocheF, matriculaFallback, previousUser) {
+        const car = cars.find(c => (cocheF.modelo || "").toUpperCase().includes(c.name.toUpperCase()))
+            || (previousUser && previousUser.car)
+            || cars[0];
+        const matricula = cocheF.matricula || cocheF.Matricula || matriculaFallback;
+        return {
+            name: cocheF.cliente || (previousUser && previousUser.name) || "Cliente",
+            car: car,
+            deliveryDate: parseFechaCita(cocheF.fechaCita),
+            agente: cocheF.agente || (previousUser && previousUser.agente) || "MANUEL",
+            entregaVO: cocheF.entregaVO || (previousUser && previousUser.entregaVO) || "NO",
+            matricula: matricula,
+            entregado: cocheF.entregado === true || cocheF.entregado === "true"
+        };
+    }
+
+    async function sincronizarDesdeCitasAgenda(matricula) {
+        const snapshot = await window.getDocs(window.query(
+            window.collection(window.db, "citas_agenda"),
+            window.where("matricula", "==", matricula)
+        ));
+        if (snapshot.empty) return null;
+        const docData = snapshot.docs[0].data();
+        if (docData.fecha && docData.hora) {
+            return `${docData.fecha}T${docData.hora}:00`;
+        }
+        return null;
+    }
+
+    async function sincronizarUsuarioDesdeFirebase() {
+        const identificador = (user.matricula || "").trim();
+        if (!identificador || identificador.length < 3) return false;
+
+        try {
+            const encontrado = await buscarVehiculoEnFirebase(identificador);
+            if (!encontrado) return false;
+
+            const cocheF = encontrado.data;
+            const matriculaLimpia = String(cocheF.matricula || cocheF.Matricula || identificador).toUpperCase().replace(/\s/g, '');
+            const usuarioAnterior = user;
+            user = buildUserFromVehiculo(cocheF, matriculaLimpia, usuarioAnterior);
+            user.vehiculoDocId = encontrado.id;
+
+            if (!user.entregado && !user.deliveryDate) {
+                const deliveryFromAgenda = await sincronizarDesdeCitasAgenda(user.matricula)
+                    || await sincronizarDesdeCitasAgenda(matriculaLimpia);
+                if (deliveryFromAgenda) user.deliveryDate = deliveryFromAgenda;
+            }
+
+            localStorage.setItem('vw_user_data', JSON.stringify(user));
+            return true;
+        } catch (e) {
+            console.warn("No se pudo sincronizar con Firebase, usando datos locales.", e);
+            return false;
+        }
+    }
+
+    let unsubscribeVehiculo = null;
+    let unsubscribeCita = null;
+
+    function detenerEscuchaTiempoReal() {
+        if (unsubscribeVehiculo) {
+            unsubscribeVehiculo();
+            unsubscribeVehiculo = null;
+        }
+        if (unsubscribeCita) {
+            unsubscribeCita();
+            unsubscribeCita = null;
+        }
+    }
+
+    function refrescarPanelSiActivo(mostrarAviso) {
+        const dash = document.getElementById('s-dash');
+        if (!dash || !dash.classList.contains('active') || !user) return;
+
+        try {
+            document.getElementById('dash-name').innerText = user.name.split(' ')[0];
+            const esAle = user.agente && user.agente.includes("ANTONIO");
+            document.getElementById('agent-name').innerText = esAle ? "Antonio Bermejo" : "Manuel Arjona";
+            document.getElementById('agent-avatar').innerText = esAle ? "AB" : "MA";
+
+            const checkVO = document.getElementById('checklist-vo');
+            if (checkVO) {
+                let voStatus = String(user.entregaVO || 'NO').toUpperCase().trim();
+                voStatus = voStatus.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                checkVO.style.display = (voStatus === 'SI' || voStatus === 'TRUE') ? 'block' : 'none';
+            }
+
+            renderTimer();
+            if (mostrarAviso) showToast("📅 Tu cita ha sido actualizada", 3500);
+        } catch (e) {
+            console.warn("No se pudo refrescar el panel:", e);
+        }
+    }
+
+    async function aplicarDatosVehiculoRemotos(cocheF) {
+        if (!user) return;
+        const matriculaLimpia = String(cocheF.matricula || cocheF.Matricula || user.matricula || "").toUpperCase().replace(/\s/g, '');
+        const usuarioAnterior = user;
+        user = buildUserFromVehiculo(cocheF, matriculaLimpia, usuarioAnterior);
+        if (usuarioAnterior.vehiculoDocId) user.vehiculoDocId = usuarioAnterior.vehiculoDocId;
+
+        if (!user.entregado && !user.deliveryDate) {
+            const deliveryFromAgenda = await sincronizarDesdeCitasAgenda(user.matricula)
+                || await sincronizarDesdeCitasAgenda(matriculaLimpia);
+            if (deliveryFromAgenda) user.deliveryDate = deliveryFromAgenda;
+        }
+
+        localStorage.setItem('vw_user_data', JSON.stringify(user));
+    }
+
+    async function iniciarEscuchaTiempoReal() {
+        detenerEscuchaTiempoReal();
+
+        if (modoPruebaActivado || !user || !user.matricula) return;
+        if (!window.onSnapshot || !window.db) return;
+
+        if (!user.vehiculoDocId) {
+            const encontrado = await buscarVehiculoEnFirebase(user.matricula);
+            if (encontrado) {
+                user.vehiculoDocId = encontrado.id;
+                localStorage.setItem('vw_user_data', JSON.stringify(user));
+            }
+        }
+
+        if (user.vehiculoDocId) {
+            unsubscribeVehiculo = window.onSnapshot(
+                window.doc(window.db, "vehiculos", user.vehiculoDocId),
+                async (snap) => {
+                    if (!snap.exists() || !user) return;
+                    const deliveryAnterior = user.deliveryDate;
+                    const entregadoAnterior = user.entregado;
+                    await aplicarDatosVehiculoRemotos(snap.data());
+                    refrescarPanelSiActivo(
+                        deliveryAnterior !== user.deliveryDate || entregadoAnterior !== user.entregado
+                    );
+                },
+                (err) => console.warn("Error escucha vehículo:", err)
+            );
+        }
+
+        const q = window.query(
+            window.collection(window.db, "citas_agenda"),
+            window.where("matricula", "==", user.matricula)
+        );
+        let primeraLecturaCita = true;
+        unsubscribeCita = window.onSnapshot(
+            q,
+            (snapshot) => {
+                if (primeraLecturaCita) {
+                    primeraLecturaCita = false;
+                    return;
+                }
+                if (!user || user.entregado || snapshot.empty) return;
+                const docData = snapshot.docs[0].data();
+                if (!docData.fecha || !docData.hora) return;
+
+                const nuevaFecha = `${docData.fecha}T${docData.hora}:00`;
+                if (user.deliveryDate === nuevaFecha) return;
+
+                user.deliveryDate = nuevaFecha;
+                localStorage.setItem('vw_user_data', JSON.stringify(user));
+                refrescarPanelSiActivo(true);
+            },
+            (err) => console.warn("Error escucha cita:", err)
+        );
+    }
+
+    async function verificarSesionLocal() {
         try {
             const saved = localStorage.getItem('vw_user_data');
             if(saved) { 
@@ -923,6 +1121,7 @@
                     navTo('s-welcome');
                     return;
                 }
+                await sincronizarUsuarioDesdeFirebase();
                 loadDash(); 
             } else { 
                 navTo('s-welcome'); 
@@ -1003,6 +1202,10 @@
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); 
         document.getElementById(id).classList.add('active'); 
         window.scrollTo(0,0);
+
+        if (id === 's-welcome' || id === 's-login') {
+            detenerEscuchaTiempoReal();
+        }
         
         if (guardarHistorial) {
             try { 
@@ -1015,6 +1218,13 @@
             if (iframe && iframe.getAttribute('src') === "") {
                 iframe.setAttribute('src', "https://docs.google.com/viewer?url=https://raw.githubusercontent.com/vwmadrid/Entregas/main/catalogo.pdf&embedded=true");
             }
+        }
+
+        if (id === 's-dash' && user) {
+            try {
+                document.getElementById('dash-name').innerText = user.name.split(' ')[0];
+                renderTimer();
+            } catch (e) {}
         }
     }
 
@@ -1068,27 +1278,28 @@
             });
 
             try {
-                const resp = await window.apiGetAllVehiculos();
-                const docs = (resp && resp.results) ? resp.results : [];
+                const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
                 let encontrado = false;
                 let enConcesionario = false;
                 let yaTieneCita = false;
                 let fechaExistente = "";
                 let cocheEncontradoParaCita = null;
 
-                docs.forEach((c) => {
+                querySnapshot.forEach((doc) => {
+                    const c = doc.data();
                     const mat = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
                     const bas = (c.bastidor || "").toUpperCase();
 
                     if ((mat === matriculaInput || bas === matriculaInput) && (c.entregado !== true && c.entregado !== "true")) {
                         encontrado = true;
                         cocheEncontradoParaCita = c;
-                        cocheEncontradoParaCita.id = c.id; 
+                        cocheEncontradoParaCita.id = doc.id; 
                         
                         if (c.pasoAInventario !== false) {
                             enConcesionario = true;
                         }
                         
+                        // 🔥 NUEVO: Detectamos si ya tiene una fecha de cita guardada
                         if (c.fechaCita && c.fechaCita.trim() !== "") {
                             yaTieneCita = true;
                             fechaExistente = c.fechaCita;
@@ -1100,7 +1311,7 @@
                 if (encontrado && yaTieneCita) {
                     Swal.fire({
                         title: 'CITA YA RESERVADA',
-                        html: `<p style="font-size:13px; font-weight:300;">Este vehículo ya tiene una cita asignada para el:<br><b style="color:var(--vw-light); font-size:15px;">${fechaExistente}</b>.<br><br>Si necesitas cambiar el día o la hora, vuelve atrás y entra a través del botón <b>'YA TENGO MI CITA'</b> para modificarla desde tu panel.</p>`,
+                        html: `<p style="font-size:13px; font-weight:300;">Este vehículo ya tiene una cita asignada para el:<br><b style="color:var(--vw-light); font-size:15px;">${escapeHtml(fechaExistente)}</b>.<br><br>Si necesitas cambiar el día o la hora, vuelve atrás y entra a través del botón <b>'YA TENGO MI CITA'</b> para modificarla desde tu panel.</p>`,
                         icon: 'warning',
                         background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
                         color: '#fff',
@@ -1171,37 +1382,34 @@
         btn.innerText = "VERIFICANDO...";
         
         try {
-            const resp = await window.apiGetAllVehiculos();
-            const docs = (resp && resp.results) ? resp.results : [];
-            let cocheF = null;
-            docs.forEach((c) => {
-                const matDB = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
-                const basDB = (c.bastidor || "").toUpperCase();
-                if (matDB === mat || basDB === mat) {
-                    cocheF = c;
-                }
-            });
+            const encontrado = await buscarVehiculoEnFirebase(mat);
 
-            if (cocheF) {
-                var car = cars.find(c => (cocheF.modelo || "").toUpperCase().includes(c.name.toUpperCase())) || cars[0];
+           if (encontrado) {
+                const cocheF = encontrado.data;
+                // 🔥 NUEVO BLOQUEO: Si no tiene cita y no está entregado, no pasa
+                let estaEntregado = (cocheF.entregado === true || cocheF.entregado === "true");
                 
-                user = { 
-                    name: cocheF.cliente || "Cliente", 
-                    car: car, 
-                    deliveryDate: null, 
-                    agente: cocheF.agente || "MANUEL", 
-                    entregaVO: cocheF.entregaVO || "NO",
-                    matricula: cocheF.matricula || mat,
-                    entregado: cocheF.entregado === true || cocheF.entregado === "true"
-                };
+                if (!cocheF.fechaCita && !estaEntregado) {
+                    Swal.fire({
+                        title: 'SIN CITA PREVIA',
+                        html: '<p style="font-size:13px; font-weight:300;">Aún no tienes una fecha de entrega programada para este vehículo.<br><br>Por favor, vuelve a la pantalla de inicio y pulsa en <b>RESERVAR CITA ENTREGA</b>.</p>',
+                        icon: 'warning',
+                        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                        color: '#fff',
+                        confirmButtonColor: '#00B0F0',
+                        confirmButtonText: 'ENTENDIDO',
+                        customClass: { popup: 'border border-gray-600 rounded-3xl' }
+                    });
+                    btn.innerText = "ACCEDER";
+                    return; // Cortamos el proceso aquí
+                }
 
-                if (cocheF.fechaCita) {
-                    let partes = cocheF.fechaCita.split(' - ');
-                    if(partes.length === 2) {
-                        let f = partes[0].split('/');
-                        let h = partes[1].replace('h','');
-                        user.deliveryDate = `${f[2]}-${f[1]}-${f[0]}T${h}:00`;
-                    }
+                user = buildUserFromVehiculo(cocheF, mat, null);
+                user.vehiculoDocId = encontrado.id;
+                if (!user.deliveryDate && !user.entregado) {
+                    const deliveryFromAgenda = await sincronizarDesdeCitasAgenda(user.matricula)
+                        || await sincronizarDesdeCitasAgenda(mat);
+                    if (deliveryFromAgenda) user.deliveryDate = deliveryFromAgenda;
                 }
 
                 localStorage.setItem('vw_user_data', JSON.stringify(user));
@@ -1209,17 +1417,31 @@
                 navTo('s-transition');
                 setTimeout(loadDash, 2000);
             } else {
-                alert("Matrícula o bastidor no encontrado en la base de datos de vehículos."); 
+                Swal.fire({
+                    title: 'NO ENCONTRADO',
+                    text: 'Matrícula o bastidor no encontrado en la base de datos de vehículos.',
+                    icon: 'warning',
+                    background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                    color: '#fff',
+                    confirmButtonColor: '#00B0F0'
+                });
                 btn.innerText = "ACCEDER";
             }
-       } catch(e) {
-        console.error("Error en Dashboard:", e);
-        localStorage.clear();
-        navTo('s-welcome');
+        } catch (e) {
+            console.error("Error leyendo los datos:", e);
+            Swal.fire({
+                title: 'ERROR DE RED',
+                text: 'Comprueba tu conexión a internet.',
+                icon: 'error',
+                background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                color: '#fff',
+                confirmButtonColor: '#00B0F0'
+            });
+            btn.innerText = "ACCEDER";
+        }
     }
-}
     
-   function loadDash() {
+    function loadDash() {
         navTo('s-dash');
         
         try {
@@ -1232,7 +1454,7 @@
 
             document.getElementById('dash-name').innerText = user.name.split(' ')[0];
             document.getElementById('real-car-img').src = "https://raw.githubusercontent.com/vwmadrid/Entregas/main/images/" + user.car.file;
-            document.getElementById('video-frame').src = "https://www.youtube.com/embed/" + user.car.vid;
+            document.getElementById('video-frame').src = "https://www.youtube.com/embed/" + resolverVideoId(user.car.vid);
             
             var esAle = user.agente && user.agente.includes("ANTONIO");
             document.getElementById('agent-name').innerText = esAle ? "Antonio Bermejo" : "Manuel Arjona";
@@ -1253,60 +1475,11 @@
                 }
             }
 
-           // 🔥 RADARES EN VIVO (polling al backend) 🔥
-            if (user && user.matricula && !window.listenerCitaActivado) {
-                window.listenerCitaActivado = true;
-                let userMatLimpia = user.matricula.toUpperCase().replace(/\s/g, '');
-
-                async function pollRadar() {
-                    try {
-                        // comprobar citas
-                        const respCitas = await fetch(window.API_BASE + '/api/citas/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: 'matricula', value: userMatLimpia }) });
-                        const jsonCitas = await respCitas.json();
-                        (jsonCitas.results || []).forEach(dataCita => {
-                            let matCita = (dataCita.matricula || "").toUpperCase().replace(/\s/g, '');
-                            let basCita = (dataCita.bastidor || "").toUpperCase().replace(/\s/g, '');
-                            if (matCita === userMatLimpia || (basCita && basCita === userMatLimpia)) {
-                                if (dataCita.fecha && dataCita.hora) {
-                                    let partesHora = dataCita.hora.replace('h','').trim().split(':');
-                                    let hora = partesHora[0].padStart(2, '0');
-                                    let min = partesHora[1] ? partesHora[1].padStart(2, '0') : '00';
-                                    let nuevaFechaIso = `${dataCita.fecha}T${hora}:${min}:00`;
-                                    if (user.deliveryDate !== nuevaFechaIso) {
-                                        user.deliveryDate = nuevaFechaIso;
-                                        localStorage.setItem('vw_user_data', JSON.stringify(user));
-                                        if (window.intervaloReloj) clearInterval(window.intervaloReloj);
-                                        renderTimer();
-                                    }
-                                }
-                            }
-                        });
-
-                        // comprobar vehiculos
-                        const respVeh = await fetch(window.API_BASE + '/api/vehiculos/buscar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: userMatLimpia }) });
-                        const jsonVeh = await respVeh.json();
-                        (jsonVeh.results || []).forEach(v => {
-                            const matDB = (v.matricula || v.Matricula || "").toUpperCase().replace(/\s/g, '');
-                            const basDB = (v.bastidor || "").toUpperCase();
-                            if (matDB === userMatLimpia || (basDB && basDB === userMatLimpia)) {
-                                let nuevoEntregado = (v.entregado === true || v.entregado === "true");
-                                if (user.entregado !== nuevoEntregado) {
-                                    user.entregado = nuevoEntregado;
-                                    localStorage.setItem('vw_user_data', JSON.stringify(user));
-                                    renderTimer();
-                                }
-                            }
-                        });
-                    } catch (e) { console.error('Radar poll error', e); }
-                }
-
-                // Ejecutar por primera vez y luego cada 15s
-                pollRadar();
-                window._radarInterval = setInterval(pollRadar, 15000);
-            }
+            iniciarEscuchaTiempoReal();
 
         } catch(e) {
             console.error("Error en Dashboard:", e);
+            detenerEscuchaTiempoReal();
             localStorage.clear();
             navTo('s-welcome');
         }
@@ -1329,14 +1502,7 @@
                 
                 containerSpecific.innerHTML = ''; 
                 for (let i = 1; i < videosToLoad.length; i++) {
-                    let v = videosToLoad[i];
-                    containerSpecific.innerHTML += `
-                    <div class="video-mini-card" onclick="playQuickVideo('${v.id}', '${v.title}')">
-                        <div class="thumb" style="background: url('https://img.youtube.com/vi/${v.id}/0.jpg');">
-                            <div class="thumb-overlay"><i class="fas fa-play"></i></div>
-                        </div>
-                        <p style="font-size: 11px; text-align: center; margin-top: 8px; font-weight: 600; color: white;">${v.title}</p>
-                    </div>`;
+                    containerSpecific.innerHTML += htmlTarjetaVideo(videosToLoad[i]);
                 }
             }
         } else {
@@ -1347,13 +1513,7 @@
         if (containerGeneral) {
             containerGeneral.innerHTML = '';
             generalVideos.forEach(v => {
-                containerGeneral.innerHTML += `
-                <div class="video-mini-card" onclick="playQuickVideo('${v.id}', '${v.title}')">
-                    <div class="thumb" style="background: url('https://img.youtube.com/vi/${v.id}/0.jpg');">
-                        <div class="thumb-overlay"><i class="fas fa-play"></i></div>
-                    </div>
-                    <p style="font-size: 11px; text-align: center; margin-top: 8px; font-weight: 600; color: white;">${v.title}</p>
-                </div>`;
+                containerGeneral.innerHTML += htmlTarjetaVideo(v);
             });
         }
     }
@@ -1361,8 +1521,7 @@
    function renderTimer() {
         const w = document.getElementById('status-widget');
         
-       // 🌟 NUEVO: Si el coche ya ha sido entregado, mostramos el Certificado Premium
-       // 🌟 NUEVO: Si el coche ya ha sido entregado, mostramos el Certificado Premium
+       // Si el coche ya ha sido entregado, mostramos el Certificado Premium
         if (user && user.entregado) {
             w.className = "premium-countdown";
             w.style.background = "linear-gradient(145deg, rgba(0, 176, 240, 0.08) 0%, rgba(5, 10, 20, 0.9) 100%)";
@@ -1451,15 +1610,14 @@
         
         try {
             let feedbackId = new Date().getTime().toString();
-            const _token = await window.getIdToken();
-            await fetch(window.API_BASE + '/api/feedback/create', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_token||'') }, body: JSON.stringify({ id: feedbackId, data: {
+            await window.setDoc(window.doc(window.db, "app_feedback", feedbackId), {
                 facilidadUso: window.appRatings.q1,
                 utilidadVideos: window.appRatings.q2,
                 comentario: text,
                 cliente: user && user.name ? user.name : "Desconocido",
                 modelo: user && user.car ? user.car.name : "N/A",
                 fecha: new Date().toLocaleString('es-ES')
-            } }) });
+            });
             
             document.getElementById('tarjeta-encuesta').innerHTML = `
                 <i class="fas fa-check-circle" style="font-size: 45px; color: #a855f7; margin-bottom:15px; filter: drop-shadow(0 0 15px rgba(168,85,247,0.5));"></i>
@@ -1472,9 +1630,6 @@
             console.error("Error guardando encuesta:", e);
             window.showToast("Error de conexión. Revisa los permisos de Firebase.", 4000);
             btn.innerText = "ENVIAR OPINIÓN AL EQUIPO";
-            
-            // Este alert es clave para ti como desarrollador
-            alert("⚠️ AVISO PARA EL DESARROLLADOR:\nFirebase ha rechazado guardar los datos. Asegúrate de ir a la consola de Firebase > Firestore > Reglas, y verificar que tienes permiso de escritura (write: if true;) para la colección 'app_feedback'.");
         }
     };
     
@@ -1526,11 +1681,6 @@
 
     window.notifyArrival = async function() { 
         playVibration();
-
-        // 🔥 Anti-Spam: Si ya se está procesando, ignoramos más clics
-        if (window.isNotifying) return;
-        window.isNotifying = true;
-
         try {
             let mat = user.matricula || document.getElementById('username').value;
             if(!mat) throw new Error("Sin matrícula");
@@ -1538,35 +1688,26 @@
             let matriculaLimpia = mat.toUpperCase().replace(/\s/g, '');
             let docIdEncontrado = null;
 
-            const resp = await window.apiGetAllVehiculos();
-            const docs = (resp && resp.results) ? resp.results : [];
-            docs.forEach((c) => {
+            const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
+            querySnapshot.forEach((doc) => {
+                const c = doc.data();
                 const matDB = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
                 const basDB = (c.bastidor || "").toUpperCase();
                 if (matDB === matriculaLimpia || basDB === matriculaLimpia) {
-                    docIdEncontrado = c.id;
+                    docIdEncontrado = doc.id;
                 }
             });
-
+            
             if (docIdEncontrado) {
                 const btnLlegada = document.getElementById('btnLlegada');
-                const _token = await window.getIdToken();
-                await fetch(window.API_BASE + '/api/vehiculos/update', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_token||'') },
-                    body: JSON.stringify({ id: docIdEncontrado, data: { clienteEnPuerta: true, alertaAtendida: false } })
+                await window.updateDoc(window.doc(window.db, "vehiculos", docIdEncontrado), { 
+                    clienteEnPuerta: true,
+                    alertaAtendida: false 
                 });
                 
-                // 🔥 ESTE ES EL MENSAJE QUE HEMOS RECUPERADO Y MEJORADO
                 Swal.fire({
                     title: '¡AVISO ENVIADO!',
-                    html: `
-                        <div style="margin-bottom: 15px;">
-                            <i class="fas fa-coffee" style="font-size: 30px; color: #00B0F0;"></i>
-                        </div>
-                        <p style="font-size:14px; font-weight:300; opacity:0.9;">
-                            Tu asesor ha sido notificado al instante. Por favor, <b>toma asiento en nuestra zona de espera</b> y saldremos a recibirte en breves instantes.
-                        </p>
-                    `,
+                    html: '<p style="font-size:14px; font-weight:300; opacity:0.9;">Tu asesor ha sido notificado. Por favor, toma asiento y saldremos a recibirte en breves instantes.</p>',
                     icon: 'success',
                     iconColor: '#25D366',
                     background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
@@ -1576,7 +1717,6 @@
                     customClass: { popup: 'border border-gray-600 rounded-3xl shadow-2xl' }
                 });
 
-                // Cambiamos el estado del botón en su pantalla para que vea que ya se avisó
                 if(btnLlegada) {
                     btnLlegada.innerHTML = '<i class="fas fa-check-circle"></i> ASESOR AVISADO';
                     btnLlegada.style.background = 'linear-gradient(135deg, #001E50, #0044a0)';
@@ -1585,13 +1725,10 @@
                     btnLlegada.onclick = null; 
                     window.alertaEnviada = true;
                 }
-            
             } else {
                 throw new Error("Coche no encontrado en Firebase");
             }
         } catch(e) { 
-            window.isNotifying = false; // 🔥 Liberamos el botón si falla
-            console.log("Error al notificar llegada:", e);
             console.log("Error al notificar llegada:", e); 
             Swal.fire({
                 title: 'ERROR DE CONEXIÓN',
@@ -1616,6 +1753,10 @@
     }
 
     window.playQuickVideo = function(id, title) {
+        if (!esVideoValido(id)) {
+            showToast("Vídeo no disponible para este modelo", 3000);
+            return;
+        }
         playVibration();
         const frame = document.getElementById('video-frame');
         if(frame) frame.src = "https://www.youtube.com/embed/" + id + "?autoplay=1";
@@ -1640,10 +1781,9 @@
         if(!user) return;
         window.modoEdicion = true;
         
-        const resp = await fetch(window.API_BASE + '/api/citas/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: 'matricula', value: user.matricula }) });
-        const json = await resp.json();
-        if ((json.results || []).length) {
-            window.datosEdicion = json.results[0];
+        const snapshot = await window.getDocs(window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", user.matricula)));
+        if(!snapshot.empty) {
+            window.datosEdicion = snapshot.docs[0].data();
         } else {
             window.datosEdicion = { cliente: user.name, entregaVO: user.entregaVO };
         }
@@ -1720,12 +1860,12 @@
         gridHoras.innerHTML = `<div style="grid-column: span 2; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; color: white;"></i></div>`;
 
         try {
-            const resp = await fetch(window.API_BASE + '/api/citas/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: 'fecha', value: fechaBBDD }) });
-            const json = await resp.json();
+            const q = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", fechaBBDD));
+            const snapshot = await window.getDocs(q);
             
             let conteoHoras = {};
-            (json.results || []).forEach(doc => { 
-                let horaCita = doc.hora;
+            snapshot.forEach(doc => { 
+                let horaCita = doc.data().hora;
                 if (!conteoHoras[horaCita]) conteoHoras[horaCita] = 0;
                 conteoHoras[horaCita]++;
             });
@@ -1861,11 +2001,13 @@
                 Swal.fire({title: 'Procesando tu reserva...', didOpen: () => Swal.showLoading(), allowOutsideClick: false, background: '#001E50', color: '#fff'});
                 
                 try {
-                    const respCheck = await fetch(window.API_BASE + '/api/citas/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: 'fecha', value: fechaSeleccionadaParaReserva }) });
-                    const jsonCheck = await respCheck.json();
+                    const qCheck = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", fechaSeleccionadaParaReserva));
+                    const snapCheck = await window.getDocs(qCheck);
+                    
                     let ocupadas = 0;
                     let agentesOcupados = [];
-                    (jsonCheck.results || []).forEach(data => {
+                    snapCheck.forEach(doc => {
+                        let data = doc.data();
                         if (data.hora === horaSeleccionadaParaReserva) {
                             ocupadas++;
                             if (data.agente) agentesOcupados.push(data.agente);
@@ -1887,16 +2029,14 @@
                         agenteAsignado = Math.random() < 0.5 ? "MANUEL" : "ANTONIO";
                     }
 
-                    const respAnt = await fetch(window.API_BASE + '/api/citas/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: 'matricula', value: matOficial }) });
-                    const jsonAnt = await respAnt.json();
-                    for (const docAntiguo of (jsonAnt.results || [])) {
-                        const _token = await window.getIdToken();
-                        await fetch(window.API_BASE + '/api/citas/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_token||'') }, body: JSON.stringify({ id: docAntiguo.id }) });
+                    const qAntigua = window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", matOficial));
+                    const snapAntigua = await window.getDocs(qAntigua);
+                    for (const docAntiguo of snapAntigua.docs) {
+                        await window.deleteDoc(window.doc(window.db, "citas_agenda", docAntiguo.id));
                     }
 
                     let idCita = new Date().getTime().toString();
-                    const _token = await window.getIdToken();
-                    await fetch(window.API_BASE + '/api/citas/set', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_token||'') }, body: JSON.stringify({ id: idCita, data: {
+                    await window.setDoc(window.doc(window.db, "citas_agenda", idCita), {
                         fecha: fechaSeleccionadaParaReserva,
                         hora: horaSeleccionadaParaReserva,
                         matricula: matOficial,
@@ -1909,16 +2049,15 @@
                         agente: agenteAsignado,
                         creadoEn: new Date().toISOString(),
                         lopdAceptada: true
-                    } }) });
+                    });
 
                     if (datosCocheReserva.id) {
-                        const _token2 = await window.getIdToken();
-                        await fetch(window.API_BASE + '/api/vehiculos/update', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (_token2||'') }, body: JSON.stringify({ id: datosCocheReserva.id, data: {
+                        await window.updateDoc(window.doc(window.db, "vehiculos", datosCocheReserva.id), {
                             fechaCita: `${fechaVisual} - ${horaSeleccionadaParaReserva}h`,
                             agente: agenteAsignado,
                             cliente: nombre,
                             entregaVO: vo
-                        } }) });
+                        });
                     }
                     
                     if (email && email.includes('@')) {
@@ -1926,9 +2065,10 @@
                             console.log("Enviando orden de correo a Google...");
                             let accionCorreo = window.modoEdicion ? "modificar_correo" : "enviar_correo";
                             
-                            fetch(window.API_BASE + '/api/proxy/gas', {
+                            fetch(API_URL, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                mode: 'no-cors', 
+                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                                 body: JSON.stringify({
                                     action: accionCorreo, 
                                     email: email, 
