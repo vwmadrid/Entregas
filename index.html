@@ -31,59 +31,152 @@
         return String(str || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
     };
 
-    // API backend base (proxy): apunta a tu servidor Express (desarrollo)
-    // 🌍 Detectar automáticamente el entorno (desarrollo vs producción)
-    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isLocalServer = isDev && window.location.port === '5500'; // Live Server Port
-    
-    if (isLocalServer) {
-        // 💻 Desarrollo local: conectar al backend en localhost:3000
-        window.API_BASE = 'http://localhost:3000';
-    } else if (isDev) {
-        // 💻 Desarrollo (otro puerto): intentar localhost:3000
-        window.API_BASE = 'http://localhost:3000';
-    } else {
-        // 🚀 Producción: usar backend desplegado en Vercel
-        window.API_BASE = 'https://gescar-backend.vercel.app';
-    }
-    
-    console.log('🌍 Entorno:', isDev ? 'DESARROLLO' : 'PRODUCCIÓN');
-    console.log('📍 API Base:', window.API_BASE);
-
-    // Wrapper sencillo para llamadas al backend
-    window.apiBuscarCitas = async function(matricula) {
-        const res = await fetch(window.API_BASE + '/api/citas/buscar', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ matricula })
-        });
-        return res.json();
-    };
-
-    window.apiBuscarVehiculos = async function(q) {
-        const res = await fetch(window.API_BASE + '/api/vehiculos/buscar', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ q })
-        });
-        return res.json();
-    };
-
-    window.apiGetAllVehiculos = async function() {
-        const res = await fetch(window.API_BASE + '/api/vehiculos/all', { method: 'GET' });
-        return res.json();
-    };
-
-    // Inicializar Firebase Auth (solo para obtener ID tokens)
+    // Conexión directa a Firebase Firestore desde el frontend.
+    // Ya no usamos backend proxy; GitHub Pages sirve el HTML estático.
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, collection, doc, query, where, getDocs, getDoc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
     const firebaseConfig = {
         apiKey: "AIzaSyCRfERugbIVfAXtKa7mGdLLTm6xwxb5wlE",
         authDomain: "gestion-flotas-vw.firebaseapp.com",
         projectId: "gestion-flotas-vw"
     };
+
+    window.API_BASE = '';
+    const originalFetch = window.fetch.bind(window);
+
+    async function jsonResponse(data, status = 200) {
+        return new Response(JSON.stringify(data), {
+            status,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    async function handleApiRequest(path, method, body) {
+        const cleanPath = path.replace(/\/api\//, '');
+        const parts = cleanPath.split('/');
+
+        const collectionName = parts[0];
+        const action = parts[1];
+
+        const colRef = collection(window.db, collectionName);
+
+        const normalize = (value) => String(value || '').toUpperCase().trim();
+
+        if (collectionName === 'vehiculos' && action === 'all' && method === 'GET') {
+            const snap = await getDocs(colRef);
+            const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return jsonResponse({ results });
+        }
+
+        if (collectionName === 'vehiculos' && action === 'buscar' && method === 'POST') {
+            const q = normalize(body && body.q);
+            const snap = await getDocs(query(colRef, where('matricula', '==', q)));
+            let results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            if (!results.length) {
+                const snap2 = await getDocs(query(colRef, where('bastidor', '==', q)));
+                results = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            }
+            return jsonResponse({ results });
+        }
+
+        if (collectionName === 'citas_agenda' && action === 'buscar' && method === 'POST') {
+            const matricula = normalize(body && body.matricula);
+            const snap = await getDocs(query(colRef, where('matricula', '==', matricula)));
+            const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return jsonResponse({ results });
+        }
+
+        if (collectionName === 'citas_agenda' && action === 'query' && method === 'POST') {
+            const field = String(body.field || '');
+            const value = body.value;
+            if (!field) return jsonResponse({ error: 'missing_field' }, 400);
+            const snap = await getDocs(query(colRef, where(field, '==', value)));
+            const results = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return jsonResponse({ results });
+        }
+
+        if (collectionName === 'vehiculos' && action === 'update' && method === 'POST') {
+            const id = String(body.id || '');
+            const data = body.data || {};
+            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
+            const docRef = doc(colRef, id);
+            await updateDoc(docRef, data);
+            return jsonResponse({ ok: true });
+        }
+
+        if (collectionName === 'citas_agenda' && action === 'set' && method === 'POST') {
+            const id = String(body.id || '');
+            const data = body.data || {};
+            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
+            const docRef = doc(colRef, id);
+            await setDoc(docRef, data, { merge: true });
+            return jsonResponse({ ok: true });
+        }
+
+        if (collectionName === 'citas_agenda' && action === 'create' && method === 'POST') {
+            const data = body.data || {};
+            const safe = {};
+            ['matricula', 'phone', 'date', 'time', 'notes', 'status', 'vehicleId'].forEach(key => {
+                if (key in data) safe[key] = data[key];
+            });
+            safe.owner = (window.firebaseAuthUser && window.firebaseAuthUser.uid) || null;
+            const ref = await addDoc(colRef, safe);
+            return jsonResponse({ ok: true, id: ref.id });
+        }
+
+        if (collectionName === 'citas_agenda' && action === 'delete' && method === 'POST') {
+            const id = String(body.id || '');
+            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
+            const docRef = doc(colRef, id);
+            await deleteDoc(docRef);
+            return jsonResponse({ ok: true });
+        }
+
+        if (collectionName === 'citas_agenda' && action === 'arrivar' && method === 'POST') {
+            const id = String(body.id || '');
+            if (!id) return jsonResponse({ error: 'missing_id' }, 400);
+            const docRef = doc(colRef, id);
+            await updateDoc(docRef, { status: 'arrived', arrivedAt: serverTimestamp() });
+            return jsonResponse({ ok: true });
+        }
+
+        if (collectionName === 'feedback' && action === 'create' && method === 'POST') {
+            const id = body.id ? String(body.id) : null;
+            const data = body.data || {};
+            if (id) {
+                await setDoc(doc(colRef, id), data);
+                return jsonResponse({ ok: true, id });
+            }
+            const ref = await addDoc(colRef, data);
+            return jsonResponse({ ok: true, id: ref.id });
+        }
+
+        return jsonResponse({ error: 'not_found' }, 404);
+    }
+
+    window.fetch = async function(input, init = {}) {
+        let url = typeof input === 'string' ? input : input.url;
+        const method = (init.method || 'GET').toUpperCase();
+        if (typeof input !== 'string' && input instanceof Request) {
+            url = input.url;
+        }
+        const parsed = new URL(url, window.location.origin);
+        if (parsed.pathname.startsWith('/api/')) {
+            const body = init.body ? JSON.parse(init.body) : null;
+            return handleApiRequest(parsed.pathname, method, body);
+        }
+        return originalFetch(input, init);
+    };
+
     try {
         const _app = initializeApp(firebaseConfig);
         const _auth = getAuth(_app);
+        window.db = getFirestore(_app);
+
         onAuthStateChanged(_auth, (u) => {
+            window.firebaseAuthUser = u || null;
             if (!u) {
                 try { signInAnonymously(_auth).catch(e=>console.error('Anon signIn failed', e)); } catch(e){}
             }
@@ -96,6 +189,18 @@
                 return await user.getIdToken();
             } catch (e) { console.error('getIdToken error', e); return null; }
         };
+
+        window.collection = collection;
+        window.doc = doc;
+        window.where = where;
+        window.query = query;
+        window.getDocs = getDocs;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+        window.addDoc = addDoc;
+        window.onSnapshot = onSnapshot;
     } catch (e) { console.error('Firebase Auth init failed', e); }
     </script>
     <style>

@@ -1,28 +1,35 @@
-Backend proxy minimal para GesCar
+GesCar Frontend estático para GitHub Pages
 
-Instrucciones rápidas:
+Este proyecto puede funcionar como un sitio estático en GitHub Pages usando `index.html`.
 
-1) Copia `.env.example` a `.env` y rellena `FIREBASE_SERVICE_ACCOUNT` con el JSON de la cuenta de servicio de Firebase (sin comillas adicionales).
+## Qué hace esta versión
+- `index.html` se conecta directamente a Firebase Firestore desde el navegador.
+- No necesita servidor Node ni backend proxy para funcionar.
+- GitHub Pages sólo sirve los archivos estáticos: `index.html`, `manifest.json`, `images/`, etc.
 
-2) Instala dependencias:
+## Qué archivos son necesarios
+- `index.html`
+- `manifest.json`
+- `images/` y otros activos estáticos
+- `README.md` para documentación
 
-```bash
-npm install
-```
+## Qué puede ignorarse si usas sólo GitHub Pages
+- `server.js`
+- `api/`
+- `vercel.json`
+- `package.json` / `package-lock.json`
+- `.env` / `.env.example`
+- `README_VERCEL.md` / `VERCEL_DEPLOY.md`
 
-3) Ejecuta localmente:
+## Cómo publicar en GitHub Pages
+1. Sube el repo a GitHub.
+2. En tu repositorio, ve a `Settings` → `Pages`.
+3. Selecciona la rama `main` y la carpeta raíz `/`.
+4. Guarda y espera a que se publique.
 
-```bash
-node server.js
-# o para desarrollo con nodemon
-npx nodemon server.js
-```
+Tu página estará disponible en `https://<tu-usuario>.github.io/<tu-repo>/`.
 
-Endpoints de ejemplo:
-- `POST /api/citas/buscar` { matricula }
-- `POST /api/vehiculos/buscar` { q }
-
-Siguiente pasos recomendados:
-- Verificar y mover todas las llamadas sensibles del frontend a estos endpoints.
-- Añadir verificación de tokens (Firebase Auth) con `admin.auth().verifyIdToken(idToken)` antes de operaciones críticas.
-- Desplegar en Vercel/Render y configurar `FIREBASE_SERVICE_ACCOUNT` como variable de entorno secreta.
+## Recomendaciones
+- Si la app accede a Firestore, asegúrate de que tus reglas de Firestore permitan el acceso que necesitas.
+- Si necesitas proteger datos sensibles o usar Firebase Admin, entonces sí vale la pena un backend separado.
+- Para pruebas locales, sólo abre `index.html` en un servidor estático o usa Live Server.

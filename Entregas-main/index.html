@@ -35,9 +35,12 @@
             // 💻 Desarrollo (otro puerto): intentar localhost:3000
             window.API_BASE = 'http://localhost:3000';
         } else {
-            // 🚀 Producción: usar backend desplegado en Vercel
-            // Reemplaza "tu-backend.vercel.app" con tu dominio real
-            window.API_BASE = 'https://gescar-backend.vercel.app';
+            // 🚀 Producción: si el frontend está en Vercel, usa el mismo origen para el backend.
+            if (window.location.hostname.endsWith('.vercel.app')) {
+                window.API_BASE = window.location.origin;
+            } else {
+                window.API_BASE = 'https://gescar-backend.vercel.app';
+            }
         }
         
         console.log('🌍 Entorno:', isDev ? 'DESARROLLO' : 'PRODUCCIÓN');
