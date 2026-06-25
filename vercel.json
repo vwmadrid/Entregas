@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "env": {
+    "FIREBASE_SERVICE_ACCOUNT": "@firebase_service_account",
+    "FRONTEND_ORIGIN": "@frontend_origin"
+  },
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
+  ]
+}

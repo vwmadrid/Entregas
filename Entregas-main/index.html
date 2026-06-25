@@ -1,0 +1,2116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Castellana Wagen M-40 | Volkswagen</title>
+    
+    <meta name="author" content="Manuel Arjona Carrera & Miriam Olmo Fernández">
+    <meta name="copyright" content="© 2026 Manuel Arjona Carrera & Miriam Olmo Fernández. Todos los derechos reservados.">
+    <meta name="application-name" content="GesCar OS / M2 Code Systems">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#001E50">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg">
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
+
+    <script type="module">
+        // Reemplazo de Firestore en frontend por llamadas al backend (proxy)
+        // Uso Firebase Auth únicamente para obtener ID tokens y delegar las operaciones al backend.
+        
+        // 🌍 Detectar automáticamente el entorno (desarrollo vs producción)
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isLocalServer = isDev && window.location.port === '5500'; // Live Server Port
+        
+        if (isLocalServer) {
+            // 💻 Desarrollo local: conectar al backend en localhost:3000
+            window.API_BASE = 'http://localhost:3000';
+        } else if (isDev) {
+            // 💻 Desarrollo (otro puerto): intentar localhost:3000
+            window.API_BASE = 'http://localhost:3000';
+        } else {
+            // 🚀 Producción: usar backend desplegado en Vercel
+            // Reemplaza "tu-backend.vercel.app" con tu dominio real
+            window.API_BASE = 'https://gescar-backend.vercel.app';
+        }
+        
+        console.log('🌍 Entorno:', isDev ? 'DESARROLLO' : 'PRODUCCIÓN');
+        console.log('📍 API Base:', window.API_BASE);
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRfERugbIVfAXtKa7mGdLLTm6xwxb5wlE",
+            authDomain: "gestion-flotas-vw.firebaseapp.com",
+            projectId: "gestion-flotas-vw"
+        };
+
+        try {
+            const _app = initializeApp(firebaseConfig);
+            const _auth = getAuth(_app);
+            onAuthStateChanged(_auth, (u) => {
+                if (!u) {
+                    try { signInAnonymously(_auth).catch(e=>console.error('Anon signIn failed', e)); } catch(e){}
+                }
+            });
+            window.getIdToken = async function() {
+                try {
+                    if (!_auth.currentUser) await signInAnonymously(_auth);
+                    const user = _auth.currentUser;
+                    if (!user) return null;
+                    return await user.getIdToken();
+                } catch (e) { console.error('getIdToken error', e); return null; }
+            };
+        } catch (e) { console.error('Firebase Auth init failed', e); }
+
+        // Helper para llamadas al backend con token
+        async function sendApi(path, method='POST', body=null) {
+            const headers = { 'Content-Type': 'application/json' };
+            const token = (window.getIdToken) ? await window.getIdToken() : null;
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const opts = { method, headers };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch(window.API_BASE + path, opts);
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('application/json')) return res.json();
+            return res.text();
+        }
+
+        // Shims compatibles con el código existente que usaba la API de Firestore
+        window.collection = function(_db, name) { return { __collection: name }; };
+        window.doc = function(_db, coll, id) {
+            // soporta doc(window.db, 'vehiculos', id) o doc(window.db, 'vehiculos')
+            if (id === undefined) return { __collection: coll, __id: null };
+            return { __collection: coll, __id: id };
+        };
+        window.where = function(field, op, value) { return { __where: { field, op, value } }; };
+        window.query = function(collectionObj, whereObj) { return { __collection: collectionObj && collectionObj.__collection, __where: whereObj && whereObj.__where }; };
+
+        window.getDocs = async function(q) {
+            if (!q || !q.__collection) return { empty: true, docs: [], forEach: () => {} };
+            if (q.__collection === 'vehiculos') {
+                if (q.__where && (q.__where.field === 'matricula' || q.__where.field === 'bastidor')) {
+                    const resp = await sendApi('/api/vehiculos/buscar', 'POST', { q: q.__where.value });
+                    const results = resp.results || [];
+                    const docs = results.map(r => ({ id: r.id, data: () => r }));
+                    return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
+                }
+                const resp = await sendApi('/api/vehiculos/all', 'GET');
+                const results = resp.results || [];
+                const docs = results.map(r => ({ id: r.id, data: () => r }));
+                return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
+            }
+            if (q.__collection === 'citas_agenda') {
+                if (q.__where) {
+                    const resp = await sendApi('/api/citas/query', 'POST', { field: q.__where.field, value: q.__where.value });
+                    const results = resp.results || [];
+                    const docs = results.map(r => ({ id: r.id, data: () => r }));
+                    return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
+                }
+            }
+            return { empty: true, docs: [], forEach: () => {} };
+        };
+
+        window.setDoc = async function(docRef, data) {
+            if (!docRef || !docRef.__collection) return null;
+            if (docRef.__collection === 'app_feedback') {
+                if (docRef.__id) return sendApi('/api/feedback/create', 'POST', { id: docRef.__id, data });
+                return sendApi('/api/feedback/create', 'POST', { data });
+            }
+            if (docRef.__collection === 'citas_agenda') {
+                return sendApi('/api/citas/set', 'POST', { id: docRef.__id, data });
+            }
+            return sendApi(`/api/${docRef.__collection}/set`, 'POST', { id: docRef.__id, data });
+        };
+
+        window.updateDoc = async function(docRef, data) {
+            if (!docRef || !docRef.__collection) return null;
+            if (docRef.__collection === 'vehiculos') return sendApi('/api/vehiculos/update', 'POST', { id: docRef.__id, data });
+            if (docRef.__collection === 'citas_agenda') return sendApi('/api/citas/update', 'POST', { id: docRef.__id, data });
+            return sendApi(`/api/${docRef.__collection}/update`, 'POST', { id: docRef.__id, data });
+        };
+
+        window.deleteDoc = async function(docRef) {
+            if (!docRef || !docRef.__collection) return null;
+            if (docRef.__collection === 'citas_agenda') return sendApi('/api/citas/delete', 'POST', { id: docRef.__id });
+            return sendApi(`/api/${docRef.__collection}/delete`, 'POST', { id: docRef.__id });
+        };
+
+        // onSnapshot: implementa polling sencillo en desarrollo (dev only)
+        window.onSnapshot = function(target, onNext, onError) {
+            let stopped = false;
+            const poll = async () => {
+                try {
+                    if (stopped) return;
+                    if (target && target.__id) {
+                        // buscar documento por id en la colección (fallback usando /all)
+                        const resp = await sendApi(`/api/${target.__collection}/all`, 'GET');
+                        const doc = (resp.results || []).find(r => r.id === target.__id);
+                        const docs = doc ? [{ id: doc.id, data: () => doc }] : [];
+                        onNext({ empty: docs.length === 0, docs });
+                    } else {
+                        const snap = await window.getDocs(target);
+                        onNext(snap);
+                    }
+                } catch (e) {
+                    if (onError) onError(e);
+                }
+                if (!stopped) setTimeout(poll, 3000);
+            };
+            poll();
+            return () => { stopped = true; };
+        };
+    </script>
+
+    <style>
+        :root {
+            --vw-blue: #001E50; --vw-light: #00B0F0; --glass: rgba(15, 25, 45, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08); --renting-alert: #ff9800; --success: #25D366;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        ::-webkit-scrollbar { display: none; }
+        input, textarea, select { -webkit-user-select: text !important; user-select: text !important; font-family: inherit; }
+
+        body {
+            margin: 0; padding: 0; background: #000; color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            background: radial-gradient(circle at 50% 50%, #1a3a60 0%, #000510 80%);
+            background-size: 150% 150%;
+            animation: bgBreath 10s ease-in-out infinite alternate;
+            background-attachment: fixed;
+            overflow-x: hidden; 
+            width: 100%;
+        }
+        @keyframes bgBreath { 0% { background-position: 30% 30%; } 100% { background-position: 70% 70%; } }
+
+        .app-container { width: 100%; max-width: 450px; margin: 0 auto; padding-bottom: 120px; min-height: 100vh; position: relative; }
+        .screen { display: none; flex-direction: column; padding: 25px; animation: fadeIn 0.4s ease-out; }
+        .screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+        .welcome-header { text-align: center; margin-top: 40px; margin-bottom: 25px; padding: 0 10px; }
+        .welcome-header h1 { font-weight: 100; font-size: 24px; line-height: 1.1; margin: 0; color: white; text-transform: uppercase; }
+        .welcome-header h1 b { font-weight: 700; display: block; font-size: 32px; letter-spacing: -1px; margin-top: 5px; color: white; }
+        .welcome-header h1 span { display: block; font-weight: 900; font-size: 45px; color: white; margin-top: -5px; }
+        .welcome-header p { font-size: 14px; opacity: 0.7; margin-top: 20px; font-weight: 300; }
+
+        .reset-btn { position: fixed; top: 15px; right: 15px; font-size: 10px; opacity: 0.5; background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 20px; z-index: 10000; color: white; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); }
+
+        #s-splash { position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:9999; display:flex; justify-content:center; align-items:center; }
+        .splash-logo { width: 100px; animation: pulse 2.5s infinite; filter: brightness(0) invert(1) !important; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+        .section-title { font-size: 11px; font-weight: 800; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin: 30px 0 15px 0; text-transform: uppercase; }
+
+        .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .tile { 
+            background: linear-gradient(145deg, rgba(30, 45, 75, 0.4) 0%, rgba(10, 15, 30, 0.6) 100%);
+            padding: 22px 20px; 
+            border-radius: 24px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between;
+            min-height: 115px;
+            border: 1px solid rgba(255, 255, 255, 0.06); 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+        }
+        .tile:active { transform: scale(0.96); background: rgba(30, 45, 75, 0.6); } 
+        .tile.wide { grid-column: span 2; flex-direction: row; align-items: center; min-height: 90px; }
+        
+        .tile i.premium-icon {
+            font-size: 26px;
+            background: -webkit-linear-gradient(45deg, #00B0F0, #ffffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 15px;
+            align-self: flex-start;
+            filter: drop-shadow(0px 2px 4px rgba(0, 176, 240, 0.3));
+        }
+        .tile span.tile-label { font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.9); letter-spacing: 0.5px; }
+
+        .premium-countdown {
+            background: linear-gradient(145deg, rgba(20, 30, 50, 0.8) 0%, rgba(5, 10, 20, 0.9) 100%);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 26px;
+            margin-bottom: 30px;
+            padding: 25px 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .premium-countdown::before {
+            content: ''; position: absolute; top: -50%; left: 0%; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at 50% 0%, rgba(0, 176, 240, 0.2), transparent 60%);
+            pointer-events: none;
+        }
+        .pc-header { text-align: center; margin-bottom: 15px; position: relative; z-index: 1; }
+        .pc-title { font-size: 10px; color: var(--vw-light); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+        .pc-datetime { font-size: 20px; color: white; font-weight: 300; letter-spacing: 1px; }
+        .pc-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); margin: 20px 0; position: relative; z-index: 1; }
+        .pc-timer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; position: relative; z-index: 1; }
+        .pc-time-unit div:first-child { font-size: 34px; font-weight: 200; color: white; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.5); margin-bottom: 6px; }
+        .pc-time-unit div:last-child { font-size: 9px; color: rgba(255,255,255,0.5); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        .reveal-container { position: relative; width: 100%; height: 320px; border-radius: 35px; overflow: hidden; margin-bottom: 25px; background: radial-gradient(circle at center 80%, #2a4a70 0%, #000000 70%); border: 1px solid var(--glass-border); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 30px; }
+        .car-photo { width: 100%; height: auto; object-fit: contain; z-index: 3; transition: 1.2s ease-out; -webkit-box-reflect: below -25px linear-gradient(transparent, transparent 60%, rgba(255,255,255,0.15)); }
+        
+        .float-animation { animation: float 4s ease-in-out infinite; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-8px); } 100% { transform: translateY(0px); } }
+
+        .blue-cover { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, #001e50 0%, #0044a0 50%, #001e50 100%); z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 1.2s cubic-bezier(0.45, 0.05, 0.55, 0.95), opacity 0.8s ease; cursor: pointer; box-shadow: inset 0 0 100px rgba(0,0,0,0.5); }
+        .blue-cover.open { transform: translateY(-110%) skewY(-5deg); opacity: 0; }
+
+        .btn-glow { background: linear-gradient(135deg, #00B0F0, #006090); color: white; border: none; padding: 18px; border-radius: 50px; font-weight: 700; width: 100%; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; font-size: 13px; margin-top: 10px; transition: 0.2s; box-shadow: 0 4px 15px rgba(0, 176, 240, 0.3); }
+        .btn-glow:active { transform: scale(0.98); }
+        .btn-checkin { background: linear-gradient(135deg, #11998e, #38ef7d); color: #000; border: none; padding: 18px; border-radius: 50px; font-weight: 800; width: 100%; margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3); }
+        .btn-checkin:active { transform: scale(0.98); }
+
+       .app-survey-card { margin-top: 30px; padding: 25px; border-radius: 25px; text-align: center; background: linear-gradient(145deg, rgba(30, 45, 75, 0.4) 0%, rgba(10, 15, 30, 0.6) 100%); border: 1px solid rgba(168, 85, 247, 0.4); position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .survey-badge { position: absolute; top: 0; right: 0; background: rgba(168, 85, 247, 0.2); color: #c084fc; font-size: 8px; font-weight: 900; padding: 5px 12px; border-bottom-left-radius: 15px; letter-spacing: 1px; text-transform: uppercase; }
+        .star-rating { display: flex; justify-content: center; gap: 12px; color: rgba(255,255,255,0.15); font-size: 32px; cursor: pointer; margin: 15px 0; }
+        .star-rating i.active { color: #FFD700; filter: drop-shadow(0 0 8px rgba(255,215,0,0.6)); transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1); transform: scale(1.1); }
+
+        .checklist-group { margin-bottom: 20px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 25px; border: 1px solid var(--glass-border); }
+        .checklist-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--glass); border-radius: 16px; margin-bottom: 10px; border: 1px solid var(--glass-border); cursor: pointer; transition: 0.2s; }
+        .checklist-item:active { transform: scale(0.98); }
+        .check-circle { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
+        .checklist-item.checked .check-circle { background: var(--success); border-color: var(--success); color: white; }
+        
+        .faq-item { background: var(--glass); border-radius: 18px; margin-bottom: 10px; border: 1px solid var(--glass-border); overflow: hidden; }
+        .faq-head { padding: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .faq-body { padding: 0 18px 18px 18px; font-size: 12px; opacity: 0.8; display: none; line-height: 1.4; }
+        .faq-item.open .faq-body { display: block; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid-item { background: rgba(30, 45, 75, 0.4); padding: 20px 15px; border-radius: 20px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.06); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; cursor: pointer; transition: 0.2s; }
+        .grid-item:active { transform: scale(0.95); background: rgba(30, 45, 75, 0.6); }
+        .grid-item i { font-size: 24px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5)); }
+        .grid-item span { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.9); }
+        
+        .w-red { color: #ff4444; } .w-orange { color: #ff9800; } .w-blue { color: var(--vw-light); }
+        
+        .video-grid-shorts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .video-mini-card { background: var(--glass); border-radius: 15px; overflow: hidden; border: 1px solid var(--glass-border); cursor: pointer; transition: transform 0.2s; padding-bottom: 8px; }
+        .video-mini-card:active { transform: scale(0.96); }
+        .thumb { height: 100px; background-size: cover !important; background-position: center !important; position: relative; }
+        .thumb-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; transition: 0.2s; }
+        .video-mini-card:hover .thumb-overlay { background: rgba(0, 176, 240, 0.4); }
+
+        .pdf-viewer { width: 100%; height: 450px; border-radius: 20px; border: 1px solid var(--glass-border); background: white; margin-bottom: 15px; }
+        .dealer-hero { width: 110%; height: 220px; margin-left: -5%; margin-top: -25px; margin-bottom: 25px; object-fit: cover; border-bottom-left-radius: 40px; border-bottom-right-radius: 40px; }
+        
+        #toast { visibility: hidden; min-width: 250px; background-color: white; color: black; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 9999; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 13px; font-weight: 600; opacity: 0; transition: 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+        
+        .swal2-popup { border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 25px !important; width: 90% !important; max-width: 380px !important; margin: 0 auto !important; }
+        .swal2-title { color: #fff !important; font-weight: 800 !important; font-size: 20px !important; margin-top: 10px !important; }
+        .swal2-html-container { color: #ccc !important; overflow: hidden !important; }
+        #swal-mat-verif { 
+            width: 90% !important; 
+            max-width: 300px !important; 
+            margin: 15px auto !important; 
+            display: block !important; 
+            font-size: 13px !important; 
+            padding: 12px 10px !important; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="reset-btn" onclick="localStorage.clear(); location.reload();">RESET APP</div>
+    
+    <div id="s-splash">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" class="splash-logo" style="filter: brightness(0) invert(1) !important;">
+    </div>
+
+    <section id="s-welcome" class="screen active">
+        <div class="welcome-header">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="60" style="filter: brightness(0) invert(1); margin-bottom:20px;">
+            <h1>Bienvenido a <b>Castellana Wagen</b> <span>M-40</span></h1>
+            <p>Tu herramienta digital de entrega personalizada.</p>
+        </div>
+        <div id="botones-inicio" style="background:var(--glass); padding:30px; border-radius:30px; border:1px solid var(--glass-border); margin-top:10px;">
+            <button class="btn-glow" onclick="playVibration(); verificarVehiculoParaCita()">📅 RESERVAR CITA ENTREGA</button>
+            <button class="btn-glow" style="background:transparent; border:1px solid white; margin-top:15px; box-shadow:none;" onclick="navTo('s-login')">YA TENGO MI CITA</button>
+        </div>
+
+        <div id="mi-agenda-privada" style="display: none; margin-top: 25px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 25px; padding: 25px; width: 100%; box-sizing: border-box;">
+            <h3 style="font-size: 16px; font-weight: 800; color: white; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-top: 0; margin-bottom: 20px;">Elige tu día de entrega</h3>
+            <div id="contenedor-dias-agenda" style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 15px; scroll-snap-type: x mandatory;" class="custom-scrollbar"></div>
+            <div id="contenedor-horas-agenda" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <h4 id="titulo-fecha-elegida" style="font-size: 11px; font-weight: 800; color: var(--vw-light); text-transform: uppercase; letter-spacing: 2px; text-align: center; margin-bottom: 15px;"></h4>
+                <div id="grid-horas" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="s-login" class="screen">
+        <div style="text-align:center; margin-top:60px;">
+            <i class="fas fa-arrow-left" onclick="navTo('s-welcome')" style="float:left; font-size:20px; cursor: pointer;"></i>
+            <h2 style="font-weight:200;">Acceso Clientes</h2>
+            <p style="opacity:0.6; font-size:12px; margin-bottom:20px;">INTRODUCE TU MATRÍCULA O BASTIDOR</p>
+            <input type="text" id="username" placeholder="0000 XXX" style="width:100%; padding:18px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); border-radius:15px; color:white; text-align:center; font-size:22px; font-weight:800; outline:none; text-transform:uppercase;">
+            <button class="btn-glow" style="margin-top:20px;" onclick="doLogin()">ACCEDER</button>
+        </div>
+    </section>
+
+    <section id="s-transition" class="screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background: radial-gradient(circle at 50% 50%, #1a3a60 0%, #000510 80%); z-index:2000; justify-content:center; align-items:center; text-align:center;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="60" style="filter: brightness(0) invert(1);" class="pulse-logo">
+        <div style="font-size:20px; margin-top:30px; font-weight: 200; letter-spacing: 1px;">Preparando tu entrega...</div>
+        <span id="trans-name" style="font-size:32px; font-weight:800; color:white; margin-top:10px;"></span>
+    </section>
+
+    <section id="s-dash" class="screen">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+            <div>
+                <span id="greeting-time" style="opacity:0.5; font-size:11px; font-weight: 700; letter-spacing: 1px;">HOLA,</span>
+                <div id="dash-name" style="font-size:26px; font-weight:300;">Conductor</div>
+            </div>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="35" style="filter: brightness(0) invert(1);">
+        </div>
+        
+        <div id="status-widget"></div>
+
+       <!-- Enlace sutil para modificar cita integrado bajo el reloj -->
+        <div id="linkModificarCita" onclick="abrirModificarCita()" style="text-align: center; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.4); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; margin-top: -10px; margin-bottom: 25px; letter-spacing: 0.5px; transition: color 0.3s ease;" onmouseover="this.style.color='var(--vw-light)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">
+    <i class="fas fa-pencil-alt" style="margin-right: 5px;"></i> ¿Necesitas modificar tu fecha de entrega?
+</div>
+        
+        <div class="reveal-container" id="car-stage" onclick="reveal()">
+            <div class="blue-cover" id="cover">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" width="45" style="filter: brightness(0) invert(1); margin-bottom:10px;">
+                <h2 style="font-weight:200; margin:0; text-align:center;">TU NUEVO <span id="cover-car-name" style="font-weight:900;">VW</span></h2>
+                <div style="font-size:10px; opacity:0.8; margin-top:10px; letter-spacing:2px; font-weight:700;">TOCA PARA RETIRAR LA LONA</div>
+            </div>
+            <img id="real-car-img" class="car-photo" src="">
+        </div>
+        
+        <div style="text-align:center; font-size:9px; opacity:0.4; margin-top:-15px; margin-bottom:20px; font-weight:300; letter-spacing:0.5px;">
+            * Imagen orientativa con fines ilustrativos. Puede no corresponder exactamente a tu unidad.
+        </div>
+        
+        <button id="btnLlegada" class="btn-checkin" style="display: none;" onclick="playVibration(); notifyArrival()"><i class="fas fa-map-marker-alt"></i> YA ESTOY EN EL CONCESIONARIO</button>
+        
+        <div class="section-title">SERVICIOS DIGITALES</div>
+        
+        <div class="bento">
+            <div class="tile wide" style="background: linear-gradient(145deg, rgba(0, 176, 240, 0.1) 0%, rgba(10, 15, 30, 0.6) 100%);" onclick="whatsappMe()">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div id="agent-avatar" style="width:45px; height:45px; background:transparent; border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid var(--vw-light); font-weight:300; font-size:18px;">MA</div>
+                    <div><div id="agent-name" style="font-size:15px; font-weight:500;">Manuel Arjona</div><div style="font-size:11px; opacity:0.5; font-weight:300;">Tu Asesor Personal</div></div>
+                </div>
+                <i class="fab fa-whatsapp" style="color:#25D366; font-size:28px; filter: drop-shadow(0px 2px 4px rgba(37, 211, 102, 0.3));"></i>
+            </div>
+            
+            <div class="tile wide" onclick="navTo('s-video')">
+                <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+                    <div>
+                        <i class="fas fa-play-circle premium-icon"></i>
+                        <br>
+                        <span class="tile-label">Guía del Coche</span>
+                    </div>
+                    <i class="fas fa-chevron-right" style="opacity:0.3;"></i>
+                </div>
+            </div>
+
+            <div class="tile" onclick="navTo('s-services')">
+                <i class="fas fa-shield-alt premium-icon"></i>
+                <span class="tile-label">Asistencia</span>
+            </div>
+            <div class="tile" onclick="navTo('s-checklist')">
+                <i class="fas fa-clipboard-check premium-icon"></i>
+                <span class="tile-label">Check-List</span>
+            </div>
+            <div class="tile" onclick="navTo('s-shop')">
+                <i class="fas fa-shopping-bag premium-icon"></i>
+                <span class="tile-label">Boutique</span>
+            </div>
+            <div class="tile" onclick="navTo('s-dealership')">
+                <i class="fas fa-map-marker-alt premium-icon"></i>
+                <span class="tile-label">Contacto</span>
+            </div>
+        </div>
+
+        <div class="app-survey-card" id="tarjeta-encuesta" style="display: none; margin-top: 30px;">
+            <div class="survey-badge">GesCar OS</div>
+            <h4 style="margin:0 0 15px 0; font-size:18px; font-weight:800; color:white;">Valora tu experiencia</h4>
+            <p style="font-size:11px; font-weight:300; opacity:0.8; margin-bottom:15px; line-height:1.4;">Ayúdanos a mejorar valorando estos aspectos de la aplicación digital:</p>
+            
+            <div style="text-align: left; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.05);">
+                <label style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); text-transform:uppercase;">1. Facilidad de uso de la App</label>
+                <div class="star-rating" id="stars-q1" style="justify-content: flex-start; margin: 5px 0 15px 0; font-size: 28px;">
+                    <i class="fas fa-star" onclick="rateAppMulti('q1', 1)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q1', 2)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q1', 3)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q1', 4)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q1', 5)"></i>
+                </div>
+
+                <label style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); text-transform:uppercase;">2. Utilidad de los tutoriales</label>
+                <div class="star-rating" id="stars-q2" style="justify-content: flex-start; margin: 5px 0 5px 0; font-size: 28px;">
+                    <i class="fas fa-star" onclick="rateAppMulti('q2', 1)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q2', 2)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q2', 3)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q2', 4)"></i>
+                    <i class="fas fa-star" onclick="rateAppMulti('q2', 5)"></i>
+                </div>
+            </div>
+            
+            <textarea id="app-feedback-text" placeholder="¿Qué añadirías o mejorarías de esta aplicación? (Opcional)" style="width:100%; background:rgba(0,0,0,0.3); color:white; border-radius:12px; padding:15px; border:1px solid rgba(255,255,255,0.1); outline:none; font-weight:300; font-size:12px; min-height:80px; resize:none; font-family:inherit;"></textarea>
+            
+            <button class="btn-glow" style="margin-top:15px; font-size:12px; padding:16px; background: linear-gradient(135deg, #a855f7, #6366f1); box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);" onclick="sendAppFeedbackMulti()">ENVIAR OPINIÓN AL EQUIPO</button>
+        </div>
+        <div style="text-align:center; padding:40px 0; opacity:0.3; font-size:9px; letter-spacing:2px; font-weight:300;">
+            M2 Code Systems © 2026<br>CASTELLANA WAGEN M-40
+        </div>
+    </section>
+
+    <section id="s-video" class="screen">
+        <div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;">
+            <i class="fas fa-arrow-left" onclick="navTo('s-dash')" style="cursor: pointer;"></i>
+            <span style="font-weight:800; font-size:18px;">TU COCHE AL DETALLE</span>
+        </div>
+        
+        <div class="main-video-container" style="position:relative; border-radius:25px; overflow:hidden; border:1px solid var(--vw-light); margin-bottom: 25px;">
+            <iframe id="video-frame" width="100%" height="220" src="" frameborder="0" allowfullscreen></iframe>
+        </div>
+        
+        <div class="section-title" id="titulo-conoce-modelo" style="margin-top:0;">CONOCE TU MODELO</div>
+        <div class="video-grid-shorts" id="dynamic-shorts-specific" style="display:none;"></div>
+       
+        <div class="section-title">TECNOLOGÍA VOLKSWAGEN</div>
+        <div class="video-grid-shorts" id="dynamic-shorts-general"></div>
+
+        <button class="btn-glow" style="margin-top:20px; background:rgba(255,255,255,0.05); box-shadow:none; border:1px solid rgba(255,255,255,0.2);" onclick="playVibration(); window.open('https://www.volkswagen.es/es/clientes/informacion-sobre-tu-coche/manuales.html')">
+            <i class="fas fa-book-open"></i> MANUAL POR BASTIDOR (VIN)
+        </button>
+    </section>
+
+    <section id="s-services" class="screen">
+        <div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;">
+            <i class="fas fa-arrow-left" onclick="navTo('s-dash')"></i>
+            <span style="font-weight:800; font-size:18px;">ASISTENCIA Y TALLER</span>
+        </div>
+
+        <div style="background: var(--vw-blue); color: white; border-radius: 25px; padding: 25px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 25px rgba(0,0,0,0.5); margin-bottom: 25px; position: relative; overflow: hidden;">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" style="position: absolute; right: -30px; top: -30px; width: 150px; opacity: 0.05; filter: brightness(0) invert(1); pointer-events: none;">
+            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 15px;">Si tienes algún imprevisto,</div>
+            <div style="font-size: 18px; font-weight: 800; margin-bottom: 15px; letter-spacing: 0.5px;">Talleres Castellana Wagen</div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div style="border-right: 1px solid rgba(255,255,255,0.3); padding-right: 15px;">
+                    <div style="font-size: 12px; opacity: 0.8; margin-bottom: 5px;">C/ Puerto de Somport, 8</div>
+                    <div style="font-size: 13px; font-weight: 600;">Alvaro Nombela</div>
+                    <div style="font-size: 14px; font-weight: bold; color: var(--vw-light); margin-top: 5px; cursor: pointer;" onclick="window.open('tel:646865483')">
+                        <i class="fas fa-phone-alt"></i> 646 865 483
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; opacity: 0.8; margin-bottom: 5px;">C/ Sofía, 18</div>
+                    <div style="font-size: 13px; font-weight: 600;">Manuel López</div>
+                    <div style="font-size: 14px; font-weight: bold; color: var(--vw-light); margin-top: 5px; cursor: pointer;" onclick="window.open('tel:646865105')">
+                        <i class="fas fa-phone-alt"></i> 646 865 105
+                    </div>
+                </div>
+            </div>
+
+            <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 20px 0;"></div>
+
+            <div style="font-size: 16px; font-weight: 800; margin-bottom: 8px;">Responsable Posventa Empresas V4B</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                <div style="font-size: 14px; font-weight: 600;">Álvaro Beltrán</div>
+                <div style="font-size: 15px; font-weight: bold; color: var(--vw-light); cursor: pointer; background: rgba(0, 176, 240, 0.1); padding: 5px 12px; border-radius: 50px;" onclick="window.open('tel:648006146')">
+                    <i class="fas fa-phone-alt"></i> 648 006 146
+                </div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 15px; font-size: 13px; line-height: 1.5; border: 1px solid rgba(255,255,255,0.05);">
+                Si necesitas asistencia en carretera llama a Movilidad Volkswagen al 
+                <span style="font-size: 16px; font-weight: 800; color: #ff4444; cursor: pointer;" onclick="window.open('tel:900100238')">
+                    <i class="fas fa-truck-pickup" style="font-size:12px;"></i> 900 100 238
+                </span> 
+                y solicita que gestionen tu incidencia en <span style="font-size: 15px; font-weight: 800; color: white;">Castellana Wagen</span>.
+            </div>
+        </div>
+
+        <div class="section-title">TESTIGOS Y ALERTAS</div>
+        <div style="font-size: 11px; opacity: 0.8; margin-bottom: 15px; line-height: 1.4;">
+            Los testigos del coche se categorizan por colores tipo semáforo para indicar la urgencia.
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px;">
+            <div style="background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.3); padding: 15px; border-radius: 15px;">
+                <div style="color: #ff4444; font-weight: 800; font-size: 13px; margin-bottom: 6px;">🔴 ROJO (Alerta Grave)</div>
+                <div style="font-size: 12px; color: #ddd; line-height: 1.4;"><b>Se debe detener el vehículo lo antes posible.</b></div>
+            </div>
+            <div style="background: rgba(255,152,0,0.1); border: 1px solid rgba(255,152,0,0.3); padding: 15px; border-radius: 15px;">
+                <div style="color: #ff9800; font-weight: 800; font-size: 13px; margin-bottom: 6px;">🟠 AMARILLO (Precaución)</div>
+                <div style="font-size: 12px; color: #ddd; line-height: 1.4;">Permite conducir con precaución hacia un taller.</div>
+            </div>
+            <div style="background: rgba(0,176,240,0.1); border: 1px solid rgba(0,176,240,0.3); padding: 15px; border-radius: 15px;">
+                <div style="color: var(--vw-light); font-weight: 800; font-size: 13px; margin-bottom: 6px;">🟢 AZUL / VERDE (Información)</div>
+            </div>
+        </div>
+
+        <div class="section-title">EJEMPLOS COMUNES</div>
+        <div class="grid-2" style="margin-bottom: 20px;">
+            <div class="grid-item" onclick="showToast('🟠 FALLO MOTOR: Problema de emisiones o gestión del motor. Acudir al taller pronto.', 5000)">
+                <i class="fas fa-triangle-exclamation" style="color: #ff9800; font-size: 24px;"></i><span style="margin-top:5px; font-weight:bold;">Fallo Motor</span>
+            </div>
+            <div class="grid-item" onclick="showToast('🔴 ACEITE: Presión de aceite baja. ¡PARAR INMEDIATAMENTE para no gripar el motor!', 5000)">
+                <i class="fas fa-oil-can" style="color: #ff4444; font-size: 24px;"></i><span style="margin-top:5px; font-weight:bold;">Aceite</span>
+            </div>
+            <div class="grid-item" onclick="showToast('🟠 NEUMÁTICOS: Neumático desinflado o pinchazo. Revise presión.', 4000)">
+                <i class="fas fa-gauge-high" style="color: #ff9800; font-size: 24px;"></i><span style="margin-top:5px; font-weight:bold;">Neumáticos</span>
+            </div>
+            <div class="grid-item" onclick="showToast('🔵 LUCES LARGAS: Faros de carretera activados.', 3000)">
+                <i class="fas fa-lightbulb" style="color: #00B0F0; font-size: 24px;"></i><span style="margin-top:5px; font-weight:bold;">Largas</span>
+            </div>
+        </div>
+
+        <button class="btn-glow" style="margin-bottom:30px; background:rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; font-size: 11px; padding: 15px;" onclick="window.open('https://www.volkswagen.es/es/clientes/informacion-sobre-tu-coche/luces-advertencia.html')">
+            <i class="fas fa-book-open"></i> VER GUÍA OFICIAL DE TESTIGOS VW
+        </button>
+        
+        <div class="section-title">FAQs RÁPIDAS</div>
+        <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-head"><span>💧 ¿Cuándo echar AdBlue?</span><i class="fas fa-chevron-down"></i></div><div class="faq-body">El coche avisa con 2.400km de antelación. Rellena mínimo 5L.</div></div>
+        <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-head"><span>🔘 Resetear Neumáticos</span><i class="fas fa-chevron-down"></i></div><div class="faq-body">Tras inflar las ruedas, ve a la pantalla: Vehículo > Estado > Neumáticos > SET.</div></div>
+    </section>
+
+    <section id="s-checklist" class="screen">
+        <div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;">
+            <i class="fas fa-arrow-left" onclick="navTo('s-dash')" style="cursor: pointer;"></i>
+            <span style="font-weight:800; font-size:18px;"><i class="fas fa-key"></i> CHECK-LIST ENTREGA</span>
+        </div>
+
+        <video width="100%" controls style="border-radius:25px; margin-bottom:25px; border:1px solid var(--glass-border);">
+            <source src="https://raw.githubusercontent.com/vwmadrid/Entregas/main/Conexion.mp4" type="video/mp4">
+        </video>
+
+        <div class="checklist-group">
+            <div class="section-title" style="margin-top:0;">AL RECOGER TU NUEVO VOLKSWAGEN NO OLVIDES EL:</div>
+            
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div>
+                    <div>Documento de identidad y carnet de conducir</div>
+                    <div style="font-size: 11px; opacity: 0.6; margin-top: 4px; font-weight: 300;">En formato físico o digital en vigor</div>
+                </div>
+                <div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span>Registrarse en la App de Volkswagen</span>
+                        <i class="fas fa-download" onclick="event.stopPropagation(); downloadVWApp();" style="color:var(--vw-light); cursor:pointer; font-size: 0.9em;"></i>
+                    </div>
+                    <div style="font-size: 11px; opacity: 0.6; margin-top: 4px; font-weight: 300;">Crea tu cuenta VW ID antes de la entrega</div>
+                </div>
+                <div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div>
+                    <div>Autorización de recogida del renting</div>
+                    <div style="font-size: 11px; opacity: 0.6; margin-top: 4px; font-weight: 300;">La "Puesta a disposición" es el documento en formato digital.</div>
+                </div>
+                <div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+            
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div>
+                    <div>Avisanos a tu llegada</div>
+                    <div style="font-size: 11px; opacity: 0.6; margin-top: 4px; font-weight: 300;">Pulsa el boton verde "YA ESTOY EN EL CONCESIONARIO".</div>
+                </div>
+                <div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+        </div>
+
+        <div id="checklist-vo" class="checklist-group" style="border-color:rgba(255,152,0,0.1); display: none;">
+            <div class="section-title" style="margin-top:0; color:var(--renting-alert);">AL ENTREGAR TU ANTIGUO VEHICULO, NO OLVIDES: </div>
+            
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div><div>Manual de instrucciones</div></div><div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div><div>Permiso de circulación y Ficha tecnica</div></div><div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div><div>2º Juego de llaves</div></div><div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div><div>Chaleco reflectante y Baliza V.16</div></div><div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+            <div class="checklist-item" onclick="toggleCheck(this)">
+                <div><div>Recoger tus pertenencias personales</div></div><div class="check-circle"><i class="fas fa-check"></i></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="s-shop" class="screen">
+        <div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;"><i class="fas fa-arrow-left" onclick="navTo('s-dash')" style="cursor: pointer;"></i><span style="font-weight:800; font-size:18px;">BOUTIQUE</span></div>
+        <div class="section-title">LOS MÁS VENDIDOS</div>
+        <div class="grid-2" style="margin-bottom:20px;">
+            <div class="grid-item" onclick="showProduct('Cables de Carga', 'Cables originales Volkswagen. Imprescindibles para sacar el máximo partido a tu carga pública.', 'Cables de carga', 'fas fa-charging-station')">
+                <i class="fas fa-charging-station w-blue"></i><span>Cables</span>
+            </div>
+            <div class="grid-item" onclick="showProduct('Alfombrillas Originales', 'Protección a medida contra humedad y suciedad. Sistema de fijación original para evitar deslizamientos.', 'Alfombrillas', 'fas fa-shoe-prints')">
+                <i class="fas fa-shoe-prints"></i><span>Alfombrillas</span>
+            </div>
+            <div class="grid-item" onclick="showProduct('Protector de Maletero', 'Bandeja flexible y lavable con borde elevado para proteger tu vehículo de líquidos y golpes.', 'Cubremaletero', 'fas fa-suitcase')">
+                <i class="fas fa-suitcase"></i><span>Cubremaletero</span>
+            </div>
+            <div class="grid-item" onclick="showProduct('Portabicicletas', 'Soporte compacto para bola de remolque. Seguro, plegable y compatible con bicicletas eléctricas.', 'Portabicicletas', 'fas fa-bicycle')">
+                <i class="fas fa-bicycle"></i><span>Portabicis</span>
+            </div>
+        </div>
+        
+        <iframe id="mi-iframe-catalogo" src="" class="pdf-viewer"></iframe>
+        <button class="btn-glow" style="background:rgba(255,255,255,0.05); box-shadow:none; border:1px solid rgba(255,255,255,0.2); margin-bottom:20px;" onclick="window.open('https://raw.githubusercontent.com/vwmadrid/Entregas/main/catalogo.pdf')"><i class="fas fa-file-pdf"></i> ABRIR CATÁLOGO COMPLETO</button>
+        <textarea id="wishlist" style="width:100%; margin-top:10px; background:rgba(255,255,255,0.05); color:white; border-radius:15px; padding:15px; border:1px solid rgba(255,255,255,0.1); outline:none; font-weight:300;" placeholder="¿Interesado en algo?"></textarea>
+        <button class="btn-glow" style="background:#25D366; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.2); margin-top:15px;" onclick="sendWishlist()">WHATSAPP ASESOR</button>
+    </section>
+
+    <section id="s-dealership" class="screen" style="padding-top:0;">
+        <div class="dealer-hero"><img src="https://raw.githubusercontent.com/vwmadrid/Entregas/main/images/concesionario.jpg" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://via.placeholder.com/400x200/001E50/FFFFFF?text=Castellana+Wagen';"><i class="fas fa-arrow-left" onclick="navTo('s-dash')" style="position:absolute; top:30px; left:25px; font-size:22px; color:white; text-shadow:0 2px 10px black; cursor: pointer;"></i></div>
+        <div style="padding:0 15px; text-align:center;">
+            <h3 style="font-weight:300;">Castellana Wagen M-40</h3>
+            <div style="text-align:left; background:rgba(255,255,255,0.05); padding:20px; border-radius:20px; border:1px solid var(--glass-border); font-weight:300;">
+                <p style="margin:0 0 10px 0;"><i class="fas fa-map-marker-alt w-blue" style="margin-right:10px;"></i> Calle de Sofía, 18, 28022 Madrid</p>
+                <p style="margin:0 0 10px 0;" onclick="window.open('tel:913136450')"><i class="fas fa-phone w-blue" style="margin-right:10px;"></i> 913 13 64 50</p>
+                <p style="margin:0;" onclick="window.open('https://www.volkswagenmadrid.es')"><i class="fas fa-globe w-blue" style="margin-right:10px;"></i> www.volkswagenmadrid.es</p>
+            </div>
+            <button class="btn-glow" style="margin-top:20px;" onclick="window.open('https://maps.app.goo.gl/6P6PzERyLzkiDmb18')">🚀 CÓMO LLEGAR (GPS)</button>
+        </div>
+    </section>
+
+    <div id="panel-pruebas" style="display: none; position: fixed; bottom: 20px; right: 20px; background: white; padding: 15px; border: 2px solid #001e50; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold; color: #001e50; font-family: sans-serif;">🛠️ Modo Pruebas UI</h4>
+        <label style="font-size: 12px; font-family: sans-serif; color: #555;">Seleccionar Modelo:</label>
+        <select id="selector-modelo" onchange="cargarModeloPrueba()" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ccc; font-family: sans-serif; color: black; font-weight: bold;">
+            <option value="Golf">VW Golf</option>
+            <option value="Tiguan">VW Tiguan</option>
+            <option value="Passat">VW Passat</option>
+            <option value="Tayron">VW Tayron</option>
+            <option value="Polo">VW Polo</option>
+            <option value="T-Cross">VW T-Cross</option>
+            <option value="T-Roc">VW T-Roc</option>
+            <option value="Touareg">VW Touareg</option>
+            <option value="ID.3">VW ID.3</option>
+            <option value="ID.4">VW ID.4</option>
+            <option value="ID.5">VW ID.5</option>
+            <option value="ID.7">VW ID.7</option>
+            <option value="ID. Buzz">VW ID. Buzz</option>
+            <option value="Taigo">VW Taigo</option>
+            <option value="Caddy">VW Caddy</option>
+            <option value="Multivan">VW Multivan</option>
+            <option value="Crafter">VW Crafter</option>
+        </select>
+    </div>
+    <div id="toast" onclick="installApp()"></div>
+
+    <div id="product-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; display:none; justify-content:center; align-items:center; padding:20px; backdrop-filter: blur(5px);">
+        <div style="background: linear-gradient(145deg, #001E50 0%, #000510 100%); width:100%; max-width:350px; border-radius:30px; overflow:hidden; border:1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <div style="padding:30px 25px; text-align:center;">
+                <i id="pm-icon" class="fas fa-box" style="font-size: 45px; color: var(--vw-light); margin-bottom: 20px; filter: drop-shadow(0px 4px 10px rgba(0, 176, 240, 0.3));"></i>
+                <h3 id="pm-title" style="margin:0 0 10px 0; font-size:20px; font-weight:800; text-transform:uppercase;">Título</h3>
+                <p id="pm-desc" style="font-size:13px; opacity:0.8; margin-bottom:20px; line-height:1.5; font-weight:300;">Descripción</p>
+                <div style="background: rgba(255,255,255,0.05); border-radius: 15px; padding: 15px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.1);">
+                    <i class="fas fa-file-pdf" style="color: #ff4444; font-size: 18px; margin-bottom: 8px;"></i>
+                    <p style="font-size:11px; margin:0; color:white; font-weight: 300; line-height: 1.4;">Consulta la referencia, la compatibilidad y el precio exacto para tu modelo en el <b>Catálogo PDF</b> inferior.</p>
+                </div>
+                <button class="btn-glow" id="pm-add" style="margin-bottom:10px;">AÑADIR A MIS INTERESES</button>
+                <button class="btn-glow" style="background:transparent; border:1px solid rgba(255,255,255,0.2); box-shadow:none; margin-top:0;" onclick="document.getElementById('product-modal').style.display='none'">VOLVER</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /**
+     * @project GesCar OS - Lógica de Cliente
+     */
+    const API_URL = "https://script.google.com/macros/s/AKfycbxQ5mMCC7DA0wrlpaZS6EksUAIkoDgwceIcFObevEXei8mzEw1WVfOzgKdrqBIi76p-CQ/exec";
+
+    window.escapeJS = function(str) {
+        return String(str || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    };
+
+    function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function escapeForJsString(str) {
+        return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function esVideoValido(id) {
+        return !!(id && id !== 'ID_AQUI' && /^[a-zA-Z0-9_-]{11}$/.test(id));
+    }
+    
+    const videoDictionary = {
+        "POLO": [ { id: "bxk6-Y1IYqI", title: "Presentación" } ],
+        "TCROSS": [ { id: "GgMFWXoIrow", title: "Presentación" }, { id: "X3Na5dnsg-U", title: "Frenada de emergencia" } ],
+        "GOLF": [ { id: "_KGEUPY1_L4", title: "Presentación" } ],
+        "PASSAT": [ { id: "xg5yWdxLjnQ", title: "Presentación" } ],
+        "TIGUAN": [ { id: "UOqeK51kriw", title: "Presentación" } ],
+        "TAYRON": [ { id: "A-12YvB_kdg", title: "Presentación" } ],
+        "TROC": [ { id: "s2OTyfxNcWY", title: "Presentación" } ],
+        "TOUAREG": [ { id: "azQz9t26XPU", title: "Presentación" }, { id: "npcvuUCBo1U", title: "Suspensión neumática" } ],
+        "TAIGO": [ { id: "V_ySP0h4G5o", title: "Presentación" } ],
+        "CADDY": [ { id: "uJZhDE0BTHM", title: "Presentación" } ],
+        "MULTIVAN": [ { id: "7sfAIGUnnas", title: "Presentación" } ],
+        "CRAFTER": [ { id: "RP_QlToJxvM", title: "Presentación" } ],
+        "TRANSPORTER": [ { id: "7sfAIGUnnas", title: "Presentación" } ],
+        "IDBUZZ": [ { id: "1VOEbyTnlnA", title: "Volante" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" } ],
+        "ID3": [ { id: "oFA1YxoDbJo", title: "Presentación" }, { id: "1VOEbyTnlnA", title: "Volante" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" }, { id: "S3SreCeLKRo", title: "I.D Light" }, { id: "hyt0zJ1xDx0", title: "Side Assist" } ],
+        "ID4": [ { id: "ucX88AZTWwM", title: "Presentación" }, { id: "GEqyViG2zVo", title: "Interior" }, { id: "1VOEbyTnlnA", title: "Volante" }, { id: "WNvKN_z8Bc0", title: "Pantalla" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" }, { id: "V9yGN6fSPvU", title: "Programar cargas" }, { id: "JXrs7-ZyZbo", title: "Encendido auto" }, { id: "S3SreCeLKRo", title: "I.D Light" }, { id: "hyt0zJ1xDx0", title: "Side Assist" } ],
+        "ID5": [ { id: "JdA5gJ3XuiM", title: "Presentación" }, { id: "1VOEbyTnlnA", title: "Volante" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" }, { id: "S3SreCeLKRo", title: "I.D Light" }, { id: "hyt0zJ1xDx0", title: "Side Assist" } ],
+        "ID7": [ { id: "XExc18DHRY0", title: "Presentación" }, { id: "1VOEbyTnlnA", title: "Volante" }, { id: "PoDRglz1958", title: "Control Batería" }, { id: "T8dHxbyFS7k", title: "Recargas" }, { id: "S3SreCeLKRo", title: "I.D Light" }, { id: "hyt0zJ1xDx0", title: "Side Assist" } ]
+    };
+
+    const generalVideos = [
+        { id: "VtiRnquehO4", title: "Volante" }, 
+        { id: "aG0tZ1ak_l0", title: "Lane Assist" }, 
+        { id: "HshiH9iLKLE", title: "ACC" },
+        { id: "G-MVoj-hGuI", title: "I.Q Drive" }, 
+        { id: "lJW0Gh4x20M", title: "AutoHold" }, 
+        { id: "AEGgI493F5U", title: "Inclinación Auto" },
+        { id: "3v7GssFV5Oo", title: "FrontAssist" }, 
+        { id: "eylMv9Xtzts", title: "Iluminación Inteligente" }, 
+        { id: "gce49dlqN8U", title: "Coming Home Light" },
+        { id: "lPDD5P8byFE", title: "PreCrash 360" }, 
+        { id: "GQ0Sub5OXrE", title: "Emergency Assist" }, 
+        { id: "JnxjHCTiNGU", title: "Posición volante" },
+        { id: "JUVxojdu4CE", title: "Travel Assist" }, 
+        { id: "_Oy5TkGj5E0", title: "Ángulo muerto" }
+    ];
+
+    function resolverVideoId(vid) {
+        return esVideoValido(vid) ? vid : generalVideos[0].id;
+    }
+
+    function htmlTarjetaVideo(v) {
+        if (!esVideoValido(v.id)) return '';
+        const id = escapeForJsString(v.id);
+        const titleJs = escapeForJsString(v.title);
+        const titleHtml = escapeHtml(v.title);
+        return `
+                    <div class="video-mini-card" onclick="playQuickVideo('${id}', '${titleJs}')">
+                        <div class="thumb" style="background: url('https://img.youtube.com/vi/${v.id}/0.jpg');">
+                            <div class="thumb-overlay"><i class="fas fa-play"></i></div>
+                        </div>
+                        <p style="font-size: 11px; text-align: center; margin-top: 8px; font-weight: 600; color: white;">${titleHtml}</p>
+                    </div>`;
+    }
+    
+    const cars = [
+       {name: "Golf", file: "Golf.png", vid: "_KGEUPY1_L4"}, 
+       {name: "Tiguan", file: "Tiguan.png", vid: "UOqeK51kriw"}, 
+       {name: "Passat", file: "Passat.png", vid: "xg5yWdxLjnQ"},
+       {name: "Tayron", file: "Tayron.png", vid: "A-12YvB_kdg"},
+       {name: "Polo", file: "Polo.png", vid: "bxk6-Y1IYqI"},
+       {name: "T-Cross", file: "T-Cross.png", vid: "GgMFWXoIrow"},
+       {name: "TCross", file: "T-Cross.png", vid: "GgMFWXoIrow"},
+       {name: "T-Roc", file: "T-Roc.png", vid: "s2OTyfxNcWY"},
+       {name: "TRoc", file: "T-Roc.png", vid: "s2OTyfxNcWY"},
+       {name: "Touareg", file: "Touareg.png", vid: "azQz9t26XPU"},
+       {name: "Taigo", file: "Taigo.png", vid: "V_ySP0h4G5o"},
+       {name: "Caddy", file: "Caddy.png", vid: "uJZhDE0BTHM"},
+       {name: "Multivan", file: "Multivan.png", vid: "7sfAIGUnnas"},
+       {name: "Crafter", file: "Crafter.png", vid: "RP_QlToJxvM"},
+       {name: "Transporter", file: "Transporter.png", vid: "7sfAIGUnnas"},
+       {name: "ID.3", file: "ID.3.png", vid: "oFA1YxoDbJo"},
+       {name: "ID3", file: "ID.3.png", vid: "oFA1YxoDbJo"},
+       {name: "ID.4", file: "ID.4.png", vid: "ucX88AZTWwM"},
+       {name: "ID4", file: "ID.4.png", vid: "ucX88AZTWwM"},
+       {name: "ID.5", file: "ID.5.png", vid: "JdA5gJ3XuiM"},
+       {name: "ID5", file: "ID.5.png", vid: "JdA5gJ3XuiM"},
+       {name: "ID.7", file: "ID.7.png", vid: "XExc18DHRY0"},
+       {name: "ID7", file: "ID.7.png", vid: "XExc18DHRY0"},
+       {name: "ID. Buzz", file: "ID. Buzz.png", vid: "1VOEbyTnlnA"},
+       {name: "IDBuzz", file: "ID. Buzz.png", vid: "1VOEbyTnlnA"}
+    ];
+
+    let user = null;
+    let deferredPrompt;
+    
+    const parametrosURL = new URLSearchParams(window.location.search);
+    const modoPruebaActivado = parametrosURL.get('test') === 'true';
+    
+    window.modoEdicion = false;
+    window.datosEdicion = null;
+
+    window.onload = function() {
+        // 1. Ocultar la pantalla de carga negra inicial (splash)
+        setTimeout(() => { 
+            const splash = document.getElementById('s-splash');
+            if (splash) splash.style.display = 'none'; 
+        }, 2000);
+
+        // 2. Revisar si hay panel de pruebas
+        if (modoPruebaActivado) {
+            document.getElementById('panel-pruebas').style.display = 'block';
+            window.cargarModeloPrueba();
+            return;
+        }
+
+        // 3. Revisar si viene de un email con el link para editar cita
+        const urlParams = new URLSearchParams(window.location.search);
+        const editar = urlParams.get('editar');
+        const matricula = urlParams.get('matricula');
+
+        if (editar === "true" && matricula) {
+            window.modoEdicion = true;
+
+            window.getDocs(window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", matricula)))
+            .then(snapshot => {
+                if (!snapshot.empty) {
+                    let docData = snapshot.docs[0].data();
+                    window.datosEdicion = docData; 
+
+                    let cocheParaReagendar = {
+                        matricula: docData.matricula,
+                        modelo: docData.modelo,
+                        cliente: docData.cliente,
+                        bastidor: docData.bastidor || "S/B"
+                    };
+
+                    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                    document.getElementById('s-welcome').classList.add('active');
+                    window.iniciarMotorAgenda(cocheParaReagendar);
+
+                    Swal.fire({
+                        title: 'MODIFICAR CITA',
+                        text: 'Tus datos están guardados de forma segura. Selecciona tu nuevo día y hora de entrega.',
+                        icon: 'info',
+                        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)', 
+                        color: '#fff', 
+                        confirmButtonColor: '#00b0f0'
+                    });
+                } else {
+                    Swal.fire('Aviso', 'No se encontró ninguna cita activa para esta matrícula.', 'warning');
+                    verificarSesionLocal();
+                }
+            }).catch(err => console.log("Error al buscar cita:", err));
+            return;
+        }
+
+        // 4. Si no es edición y no es prueba, intentar cargar los datos del usuario local
+        verificarSesionLocal();
+    };
+
+    function parseFechaCita(fechaCita) {
+        if (!fechaCita || !String(fechaCita).trim()) return null;
+        const partes = String(fechaCita).split(' - ');
+        if (partes.length !== 2) return null;
+        const f = partes[0].split('/');
+        const h = partes[1].replace('h', '').trim();
+        if (f.length !== 3 || !h) return null;
+        return `${f[2]}-${f[1]}-${f[0]}T${h}:00`;
+    }
+
+    async function buscarVehiculoEnFirebase(identificador) {
+        const mat = String(identificador).toUpperCase().replace(/\s/g, '');
+        const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
+        let resultado = null;
+        querySnapshot.forEach((docSnap) => {
+            const c = docSnap.data();
+            const matDB = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
+            const basDB = (c.bastidor || "").toUpperCase();
+            if (matDB === mat || basDB === mat) {
+                resultado = { data: c, id: docSnap.id };
+            }
+        });
+        return resultado;
+    }
+
+    function buildUserFromVehiculo(cocheF, matriculaFallback, previousUser) {
+        const car = cars.find(c => (cocheF.modelo || "").toUpperCase().includes(c.name.toUpperCase()))
+            || (previousUser && previousUser.car)
+            || cars[0];
+        const matricula = cocheF.matricula || cocheF.Matricula || matriculaFallback;
+        return {
+            name: cocheF.cliente || (previousUser && previousUser.name) || "Cliente",
+            car: car,
+            deliveryDate: parseFechaCita(cocheF.fechaCita),
+            agente: cocheF.agente || (previousUser && previousUser.agente) || "MANUEL",
+            entregaVO: cocheF.entregaVO || (previousUser && previousUser.entregaVO) || "NO",
+            matricula: matricula,
+            entregado: cocheF.entregado === true || cocheF.entregado === "true"
+        };
+    }
+
+    async function sincronizarDesdeCitasAgenda(matricula) {
+        const snapshot = await window.getDocs(window.query(
+            window.collection(window.db, "citas_agenda"),
+            window.where("matricula", "==", matricula)
+        ));
+        if (snapshot.empty) return null;
+        const docData = snapshot.docs[0].data();
+        if (docData.fecha && docData.hora) {
+            return `${docData.fecha}T${docData.hora}:00`;
+        }
+        return null;
+    }
+
+    async function sincronizarUsuarioDesdeFirebase() {
+        const identificador = (user.matricula || "").trim();
+        if (!identificador || identificador.length < 3) return false;
+
+        try {
+            const encontrado = await buscarVehiculoEnFirebase(identificador);
+            if (!encontrado) return false;
+
+            const cocheF = encontrado.data;
+            const matriculaLimpia = String(cocheF.matricula || cocheF.Matricula || identificador).toUpperCase().replace(/\s/g, '');
+            const usuarioAnterior = user;
+            user = buildUserFromVehiculo(cocheF, matriculaLimpia, usuarioAnterior);
+            user.vehiculoDocId = encontrado.id;
+
+            if (!user.entregado && !user.deliveryDate) {
+                const deliveryFromAgenda = await sincronizarDesdeCitasAgenda(user.matricula)
+                    || await sincronizarDesdeCitasAgenda(matriculaLimpia);
+                if (deliveryFromAgenda) user.deliveryDate = deliveryFromAgenda;
+            }
+
+            localStorage.setItem('vw_user_data', JSON.stringify(user));
+            return true;
+        } catch (e) {
+            console.warn("No se pudo sincronizar con Firebase, usando datos locales.", e);
+            return false;
+        }
+    }
+
+    let unsubscribeVehiculo = null;
+    let unsubscribeCita = null;
+
+    function detenerEscuchaTiempoReal() {
+        if (unsubscribeVehiculo) {
+            unsubscribeVehiculo();
+            unsubscribeVehiculo = null;
+        }
+        if (unsubscribeCita) {
+            unsubscribeCita();
+            unsubscribeCita = null;
+        }
+    }
+
+    function refrescarPanelSiActivo(mostrarAviso) {
+        const dash = document.getElementById('s-dash');
+        if (!dash || !dash.classList.contains('active') || !user) return;
+
+        try {
+            document.getElementById('dash-name').innerText = user.name.split(' ')[0];
+            const esAle = user.agente && user.agente.includes("ANTONIO");
+            document.getElementById('agent-name').innerText = esAle ? "Antonio Bermejo" : "Manuel Arjona";
+            document.getElementById('agent-avatar').innerText = esAle ? "AB" : "MA";
+
+            const checkVO = document.getElementById('checklist-vo');
+            if (checkVO) {
+                let voStatus = String(user.entregaVO || 'NO').toUpperCase().trim();
+                voStatus = voStatus.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                checkVO.style.display = (voStatus === 'SI' || voStatus === 'TRUE') ? 'block' : 'none';
+            }
+
+            renderTimer();
+            if (mostrarAviso) showToast("📅 Tu cita ha sido actualizada", 3500);
+        } catch (e) {
+            console.warn("No se pudo refrescar el panel:", e);
+        }
+    }
+
+    async function aplicarDatosVehiculoRemotos(cocheF) {
+        if (!user) return;
+        const matriculaLimpia = String(cocheF.matricula || cocheF.Matricula || user.matricula || "").toUpperCase().replace(/\s/g, '');
+        const usuarioAnterior = user;
+        user = buildUserFromVehiculo(cocheF, matriculaLimpia, usuarioAnterior);
+        if (usuarioAnterior.vehiculoDocId) user.vehiculoDocId = usuarioAnterior.vehiculoDocId;
+
+        if (!user.entregado && !user.deliveryDate) {
+            const deliveryFromAgenda = await sincronizarDesdeCitasAgenda(user.matricula)
+                || await sincronizarDesdeCitasAgenda(matriculaLimpia);
+            if (deliveryFromAgenda) user.deliveryDate = deliveryFromAgenda;
+        }
+
+        localStorage.setItem('vw_user_data', JSON.stringify(user));
+    }
+
+    async function iniciarEscuchaTiempoReal() {
+        detenerEscuchaTiempoReal();
+
+        if (modoPruebaActivado || !user || !user.matricula) return;
+        if (!window.onSnapshot || !window.db) return;
+
+        if (!user.vehiculoDocId) {
+            const encontrado = await buscarVehiculoEnFirebase(user.matricula);
+            if (encontrado) {
+                user.vehiculoDocId = encontrado.id;
+                localStorage.setItem('vw_user_data', JSON.stringify(user));
+            }
+        }
+
+        if (user.vehiculoDocId) {
+            unsubscribeVehiculo = window.onSnapshot(
+                window.doc(window.db, "vehiculos", user.vehiculoDocId),
+                async (snap) => {
+                    if (!snap.exists() || !user) return;
+                    const deliveryAnterior = user.deliveryDate;
+                    const entregadoAnterior = user.entregado;
+                    await aplicarDatosVehiculoRemotos(snap.data());
+                    refrescarPanelSiActivo(
+                        deliveryAnterior !== user.deliveryDate || entregadoAnterior !== user.entregado
+                    );
+                },
+                (err) => console.warn("Error escucha vehículo:", err)
+            );
+        }
+
+        const q = window.query(
+            window.collection(window.db, "citas_agenda"),
+            window.where("matricula", "==", user.matricula)
+        );
+        let primeraLecturaCita = true;
+        unsubscribeCita = window.onSnapshot(
+            q,
+            (snapshot) => {
+                if (primeraLecturaCita) {
+                    primeraLecturaCita = false;
+                    return;
+                }
+                if (!user || user.entregado || snapshot.empty) return;
+                const docData = snapshot.docs[0].data();
+                if (!docData.fecha || !docData.hora) return;
+
+                const nuevaFecha = `${docData.fecha}T${docData.hora}:00`;
+                if (user.deliveryDate === nuevaFecha) return;
+
+                user.deliveryDate = nuevaFecha;
+                localStorage.setItem('vw_user_data', JSON.stringify(user));
+                refrescarPanelSiActivo(true);
+            },
+            (err) => console.warn("Error escucha cita:", err)
+        );
+    }
+
+    async function verificarSesionLocal() {
+        try {
+            const saved = localStorage.getItem('vw_user_data');
+            if(saved) { 
+                user = JSON.parse(saved); 
+                if(!user || !user.car || !user.car.name) {
+                    localStorage.removeItem('vw_user_data');
+                    user = null;
+                    navTo('s-welcome');
+                    return;
+                }
+                await sincronizarUsuarioDesdeFirebase();
+                loadDash(); 
+            } else { 
+                navTo('s-welcome'); 
+            }
+        } catch(e) {
+            console.error("Error cargando sesión. Reseteando...", e);
+            localStorage.removeItem('vw_user_data');
+            navTo('s-welcome');
+        }
+    }
+
+    window.cargarModeloPrueba = function() {
+        const nombreModelo = document.getElementById('selector-modelo').value;
+        const carObj = cars.find(c => c.name === nombreModelo) || cars[0];
+        
+        let fechaSimulada = new Date();
+        fechaSimulada.setMinutes(fechaSimulada.getMinutes() + 5); 
+
+        user = { 
+            name: "Cliente de Prueba", 
+            car: carObj, 
+            deliveryDate: fechaSimulada.toISOString(), 
+            agente: "MANUEL", 
+            entregaVO: "NO",
+            matricula: "0000 TST" 
+        };
+
+        navTo('s-dash');
+        loadDash();
+        window.alertaEnviada = true; 
+    };
+
+    function playVibration(duration = 40) {
+        try { if (navigator.vibrate) { navigator.vibrate(duration); } } catch(e) {}
+    }
+
+    window.installApp = function() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choice) => {
+                if (choice.outcome === 'accepted') { document.getElementById('toast').className = ""; }
+                deferredPrompt = null;
+            });
+        } else {
+            if(/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                alert("En iPhone: Pulsa el botón 'Compartir' (cuadrado con flecha) y elige 'Añadir a la pantalla de inicio'");
+            }
+        }
+    }
+
+    window.showProduct = function(title, desc, itemName, iconClass) {
+        playVibration();
+        document.getElementById('pm-title').innerText = title;
+        document.getElementById('pm-desc').innerText = desc;
+        document.getElementById('pm-icon').className = iconClass;
+        
+        document.getElementById('pm-add').onclick = function() {
+            addAccesorio(itemName);
+            document.getElementById('product-modal').style.display = 'none';
+        };
+        
+        document.getElementById('product-modal').style.display = 'flex';
+    }
+
+    function addAccesorio(item) {
+        playVibration(30);
+        const wishlist = document.getElementById('wishlist');
+        if (wishlist.value.trim().length > 0) {
+            wishlist.value += ", " + item;
+        } else {
+            wishlist.value = item;
+        }
+        showToast("✅ Añadido: " + item, 2000);
+    }
+
+    window.navTo = function(id, guardarHistorial = true) { 
+        playVibration();
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); 
+        document.getElementById(id).classList.add('active'); 
+        window.scrollTo(0,0);
+
+        if (id === 's-welcome' || id === 's-login') {
+            detenerEscuchaTiempoReal();
+        }
+        
+        if (guardarHistorial) {
+            try { 
+                history.pushState({ pantalla: id }, "", "#" + id); 
+            } catch(e) { }
+        }
+
+        if (id === 's-shop') {
+            const iframe = document.getElementById('mi-iframe-catalogo');
+            if (iframe && iframe.getAttribute('src') === "") {
+                iframe.setAttribute('src', "https://docs.google.com/viewer?url=https://raw.githubusercontent.com/vwmadrid/Entregas/main/catalogo.pdf&embedded=true");
+            }
+        }
+
+        if (id === 's-dash' && user) {
+            try {
+                document.getElementById('dash-name').innerText = user.name.split(' ')[0];
+                renderTimer();
+            } catch (e) {}
+        }
+    }
+
+    window.addEventListener('popstate', function(evento) {
+        if (evento.state && evento.state.pantalla) {
+            navTo(evento.state.pantalla, false);
+        } else {
+            if (user) { navTo('s-dash', false); } 
+            else { navTo('s-welcome', false); }
+        }
+    });
+
+   window.verificarVehiculoParaCita = async function() {
+        const { value: matriculaInput } = await Swal.fire({
+            title: 'TU NUEVO VOLKSWAGEN',
+            html: `
+                <div style="font-size:13px; font-weight:300; opacity:0.8; margin-bottom:10px; line-height:1.4;">
+                    Para acceder al calendario de citas, introduce tu matrícula o bastidor y verificaremos si tu coche ya está en la campa.
+                </div>
+                <input id="swal-mat-verif" class="swal2-input text-center uppercase" style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:15px; font-weight:900; letter-spacing:2px;" placeholder="MATRÍCULA / BASTIDOR">
+            `,
+            background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+            color: '#fff',
+            showCancelButton: true,
+            confirmButtonColor: '#00B0F0',
+            cancelButtonColor: 'rgba(255,255,255,0.1)',
+            confirmButtonText: 'VERIFICAR',
+            cancelButtonText: 'VOLVER',
+            heightAuto: false, 
+            backdrop: `rgba(0,0,0,0.85)`,
+            customClass: { popup: 'border border-gray-600 rounded-3xl shadow-2xl' },
+            preConfirm: () => {
+                const m = document.getElementById('swal-mat-verif').value.toUpperCase().replace(/\s/g, '');
+                if (!m || m.length < 3) {
+                    Swal.showValidationMessage('Introduce un dato válido');
+                    return false;
+                }
+                return m;
+            }
+        });
+
+        if (matriculaInput) {
+            Swal.fire({ 
+                title: 'Conectando con Castellana Wagen...', 
+                html: '<p style="font-size:12px; opacity:0.7;">Buscando tu vehículo en nuestras instalaciones</p>',
+                background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                color: '#fff',
+                heightAuto: false,
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading() 
+            });
+
+            try {
+                const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
+                let encontrado = false;
+                let enConcesionario = false;
+                let yaTieneCita = false;
+                let fechaExistente = "";
+                let cocheEncontradoParaCita = null;
+
+                querySnapshot.forEach((doc) => {
+                    const c = doc.data();
+                    const mat = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
+                    const bas = (c.bastidor || "").toUpperCase();
+
+                    if ((mat === matriculaInput || bas === matriculaInput) && (c.entregado !== true && c.entregado !== "true")) {
+                        encontrado = true;
+                        cocheEncontradoParaCita = c;
+                        cocheEncontradoParaCita.id = doc.id; 
+                        
+                        if (c.pasoAInventario !== false) {
+                            enConcesionario = true;
+                        }
+                        
+                        // 🔥 NUEVO: Detectamos si ya tiene una fecha de cita guardada
+                        if (c.fechaCita && c.fechaCita.trim() !== "") {
+                            yaTieneCita = true;
+                            fechaExistente = c.fechaCita;
+                        }
+                    }
+                });
+
+                // 🔥 NUEVO BLOQUEO: Si ya tiene cita, no le dejamos continuar
+                if (encontrado && yaTieneCita) {
+                    Swal.fire({
+                        title: 'CITA YA RESERVADA',
+                        html: `<p style="font-size:13px; font-weight:300;">Este vehículo ya tiene una cita asignada para el:<br><b style="color:var(--vw-light); font-size:15px;">${escapeHtml(fechaExistente)}</b>.<br><br>Si necesitas cambiar el día o la hora, vuelve atrás y entra a través del botón <b>'YA TENGO MI CITA'</b> para modificarla desde tu panel.</p>`,
+                        icon: 'warning',
+                        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                        color: '#fff',
+                        heightAuto: false,
+                        confirmButtonColor: '#00B0F0',
+                        confirmButtonText: 'ENTENDIDO'
+                    });
+                } else if (encontrado && enConcesionario) {
+                    Swal.fire({
+                        title: '¡VEHÍCULO PREPARADO!',
+                        html: '<p style="font-size:13px; font-weight:300;">Tu Volkswagen ya se encuentra en nuestro concesionario. Te redirigimos para que elijas el día de tu entrega.</p>',
+                        icon: 'success',
+                        iconColor: '#25D366',
+                        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                        color: '#fff',
+                        heightAuto: false,
+                        confirmButtonColor: '#00B0F0',
+                        confirmButtonText: 'AGENDAR CITA AHORA'
+                    }).then(() => {
+                        window.iniciarMotorAgenda(cocheEncontradoParaCita);
+                    });
+                } else if (encontrado && !enConcesionario) {
+                    Swal.fire({
+                        title: 'AÚN EN TRÁNSITO',
+                        html: '<p style="font-size:13px; font-weight:300;">Tenemos constancia de tu vehículo, pero aún se encuentra en fase de logística o transporte. Te avisaremos en cuanto llegue a nuestras instalaciones para poder agendar la cita.</p>',
+                        icon: 'info',
+                        iconColor: '#00B0F0',
+                        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                        color: '#fff',
+                        heightAuto: false,
+                        confirmButtonColor: '#001E50',
+                        confirmButtonText: 'ENTENDIDO'
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'NO ENCONTRADO',
+                        html: '<p style="font-size:13px; font-weight:300;">No localizamos esta matrícula o bastidor en nuestra campa actual. Por favor, asegúrate de que el dato es correcto o contacta con tu asesor.</p>',
+                        icon: 'error',
+                        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                        color: '#fff',
+                        heightAuto: false,
+                        confirmButtonColor: '#001E50',
+                        confirmButtonText: 'VOLVER'
+                    });
+                }
+            } catch (error) {
+                console.error("Error al verificar:", error);
+                Swal.fire({
+                    title: 'ERROR DE CONEXIÓN',
+                    text: 'No hemos podido conectar con el servidor. Inténtalo de nuevo más tarde.',
+                    icon: 'error',
+                    background: '#001E50',
+                    color: '#fff',
+                    heightAuto: false,
+                    confirmButtonColor: '#00B0F0'
+                });
+            }
+        }
+    }
+
+    window.doLogin = async function() {
+        try { playVibration(); } catch(e){}
+        
+        var mat = document.getElementById('username').value.trim().toUpperCase().replace(/\s/g, '');
+        if(mat.length < 3) return;
+        
+        let btn = document.querySelector('#s-login .btn-glow');
+        btn.innerText = "VERIFICANDO...";
+        
+        try {
+            const encontrado = await buscarVehiculoEnFirebase(mat);
+
+           if (encontrado) {
+                const cocheF = encontrado.data;
+                // 🔥 NUEVO BLOQUEO: Si no tiene cita y no está entregado, no pasa
+                let estaEntregado = (cocheF.entregado === true || cocheF.entregado === "true");
+                
+                if (!cocheF.fechaCita && !estaEntregado) {
+                    Swal.fire({
+                        title: 'SIN CITA PREVIA',
+                        html: '<p style="font-size:13px; font-weight:300;">Aún no tienes una fecha de entrega programada para este vehículo.<br><br>Por favor, vuelve a la pantalla de inicio y pulsa en <b>RESERVAR CITA ENTREGA</b>.</p>',
+                        icon: 'warning',
+                        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                        color: '#fff',
+                        confirmButtonColor: '#00B0F0',
+                        confirmButtonText: 'ENTENDIDO',
+                        customClass: { popup: 'border border-gray-600 rounded-3xl' }
+                    });
+                    btn.innerText = "ACCEDER";
+                    return; // Cortamos el proceso aquí
+                }
+
+                user = buildUserFromVehiculo(cocheF, mat, null);
+                user.vehiculoDocId = encontrado.id;
+                if (!user.deliveryDate && !user.entregado) {
+                    const deliveryFromAgenda = await sincronizarDesdeCitasAgenda(user.matricula)
+                        || await sincronizarDesdeCitasAgenda(mat);
+                    if (deliveryFromAgenda) user.deliveryDate = deliveryFromAgenda;
+                }
+
+                localStorage.setItem('vw_user_data', JSON.stringify(user));
+                document.getElementById('trans-name').innerText = (user.name || "").toUpperCase();
+                navTo('s-transition');
+                setTimeout(loadDash, 2000);
+            } else {
+                Swal.fire({
+                    title: 'NO ENCONTRADO',
+                    text: 'Matrícula o bastidor no encontrado en la base de datos de vehículos.',
+                    icon: 'warning',
+                    background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                    color: '#fff',
+                    confirmButtonColor: '#00B0F0'
+                });
+                btn.innerText = "ACCEDER";
+            }
+        } catch (e) {
+            console.error("Error leyendo los datos:", e);
+            Swal.fire({
+                title: 'ERROR DE RED',
+                text: 'Comprueba tu conexión a internet.',
+                icon: 'error',
+                background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                color: '#fff',
+                confirmButtonColor: '#00B0F0'
+            });
+            btn.innerText = "ACCEDER";
+        }
+    }
+    
+    function loadDash() {
+        navTo('s-dash');
+        
+        try {
+            const currentHour = new Date().getHours();
+            let greetingText = "HOLA,";
+            if(currentHour < 12) { greetingText = "BUENOS DÍAS,"; } 
+            else if (currentHour < 20) { greetingText = "BUENAS TARDES,"; } 
+            else { greetingText = "BUENAS NOCHES,"; }
+            document.getElementById('greeting-time').innerText = greetingText;
+
+            document.getElementById('dash-name').innerText = user.name.split(' ')[0];
+            document.getElementById('real-car-img').src = "https://raw.githubusercontent.com/vwmadrid/Entregas/main/images/" + user.car.file;
+            document.getElementById('video-frame').src = "https://www.youtube.com/embed/" + resolverVideoId(user.car.vid);
+            
+            var esAle = user.agente && user.agente.includes("ANTONIO");
+            document.getElementById('agent-name').innerText = esAle ? "Antonio Bermejo" : "Manuel Arjona";
+            document.getElementById('agent-avatar').innerText = esAle ? "AB" : "MA";
+            
+            renderTimer();
+            generarVideosPorModelo(); 
+
+            const checkVO = document.getElementById('checklist-vo');
+            if (checkVO) {
+                let voStatus = String(user.entregaVO || 'NO').toUpperCase().trim();
+                voStatus = voStatus.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                
+                if (voStatus === 'SI' || voStatus === 'TRUE') {
+                    checkVO.style.display = 'block'; 
+                } else {
+                    checkVO.style.display = 'none'; 
+                }
+            }
+
+            iniciarEscuchaTiempoReal();
+
+        } catch(e) {
+            console.error("Error en Dashboard:", e);
+            detenerEscuchaTiempoReal();
+            localStorage.clear();
+            navTo('s-welcome');
+        }
+    }
+
+    function generarVideosPorModelo() {
+        if (!user || !user.car || !user.car.name) return;
+        
+        const carNameKey = user.car.name.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const videosToLoad = videoDictionary[carNameKey]; 
+
+        const containerSpecific = document.getElementById('dynamic-shorts-specific');
+        const containerGeneral = document.getElementById('dynamic-shorts-general');
+        const tituloEspecifico = document.getElementById('titulo-conoce-modelo');
+
+        if (videosToLoad && videosToLoad.length > 1) {
+            if (containerSpecific) {
+                containerSpecific.style.display = 'grid'; 
+                if (tituloEspecifico) tituloEspecifico.style.display = 'block';
+                
+                containerSpecific.innerHTML = ''; 
+                for (let i = 1; i < videosToLoad.length; i++) {
+                    containerSpecific.innerHTML += htmlTarjetaVideo(videosToLoad[i]);
+                }
+            }
+        } else {
+            if (containerSpecific) containerSpecific.style.display = 'none';
+            if (tituloEspecifico) tituloEspecifico.style.display = 'none';
+        }
+
+        if (containerGeneral) {
+            containerGeneral.innerHTML = '';
+            generalVideos.forEach(v => {
+                containerGeneral.innerHTML += htmlTarjetaVideo(v);
+            });
+        }
+    }
+
+   function renderTimer() {
+        const w = document.getElementById('status-widget');
+        
+       // Si el coche ya ha sido entregado, mostramos el Certificado Premium
+        if (user && user.entregado) {
+            w.className = "premium-countdown";
+            w.style.background = "linear-gradient(145deg, rgba(0, 176, 240, 0.08) 0%, rgba(5, 10, 20, 0.9) 100%)";
+            w.style.borderColor = "rgba(0, 176, 240, 0.3)";
+            w.innerHTML = `
+                <div class="pc-header" style="margin-bottom: 0;">
+                    <div style="width: 65px; height: 65px; border-radius: 50%; background: linear-gradient(135deg, #00B0F0, #001E50); display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; box-shadow: 0 8px 25px rgba(0,176,240,0.4); border: 2px solid rgba(255,255,255,0.2);">
+                        <i class="fas fa-car" style="font-size: 28px; color: white;"></i>
+                    </div>
+                    <div class="pc-title" style="color: #00B0F0; font-size: 11px; letter-spacing: 3px;">ENTREGA COMPLETADA</div>
+                    <div class="pc-datetime" style="font-size: 20px; font-weight: 800; margin-top: 8px;">¡A disfrutar de tu ${window.escapeJS(user.car.name)}!</div>
+                    <div style="height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); margin: 18px 0;"></div>
+                    <p style="font-size: 12px; opacity: 0.8; font-weight: 300; line-height: 1.5; margin: 0; padding: 0 5px;">
+                        Para <b>Castellana Wagen</b> ha sido un placer acompañarte. Recuerda que tienes los manuales y la asistencia en carretera disponibles en esta app para cuando los necesites. ¡Buen viaje!
+                    </p>
+                </div>
+            `;
+            
+            // Mostrar la nueva tarjeta de la encuesta
+            const surveyCard = document.getElementById('tarjeta-encuesta');
+            if (surveyCard) surveyCard.style.display = 'block';
+            
+            // Ocultar definitivamente el botón de modificar cita
+            const linkModificar = document.getElementById('linkModificarCita');
+            if (linkModificar) linkModificar.style.display = 'none';
+            
+            return;
+        }
+            
+        // --- CÓDIGO NORMAL SI EL COCHE NO HA SIDO ENTREGADO ---
+        if(!user.deliveryDate) { w.innerHTML = "<div style='padding:20px; color:rgba(255,255,255,0.5); text-align:center; font-weight:300; letter-spacing:1px;'>CITA PENDIENTE DE CONFIRMAR</div>"; return; }
+        
+        const dDate = new Date(user.deliveryDate);
+        const dateStr = dDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+        const timeStr = dDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+        w.className = "premium-countdown"; 
+        w.style.background = "linear-gradient(145deg, rgba(20, 30, 50, 0.8) 0%, rgba(5, 10, 20, 0.9) 100%)";
+        w.style.borderColor = "rgba(255, 255, 255, 0.08)";
+        w.innerHTML = `
+            <div class="pc-header">
+                <div class="pc-title">TU CITA DE ENTREGA</div>
+                <div class="pc-datetime">${dateStr}  •  ${timeStr} h</div>
+            </div>
+            <div class="pc-divider"></div>
+            <div class="pc-timer-grid">
+                <div class="pc-time-unit"><div id="d-days">0</div><div>DÍAS</div></div>
+                <div class="pc-time-unit"><div id="d-hours">0</div><div>HRS</div></div>
+                <div class="pc-time-unit"><div id="d-mins">0</div><div>MIN</div></div>
+                <div class="pc-time-unit"><div id="d-secs">0</div><div>SEG</div></div>
+            </div>
+        `;
+
+        if(window.tInt) clearInterval(window.tInt);
+        window.tInt = setInterval(updateTimer, 1000);
+        updateTimer();
+    }
+    // 🌟 NUEVA LÓGICA DE LA ENCUESTA MÚLTIPLE 🌟
+    window.appRatings = { q1: 0, q2: 0 };
+    
+    window.rateAppMulti = function(question, stars) {
+        try { playVibration(30); } catch(e) {}
+        window.appRatings[question] = stars;
+        
+        // Colorear las estrellas solo de la pregunta que se está tocando
+        const starElements = document.querySelectorAll('#stars-' + question + ' i');
+        starElements.forEach((star, index) => {
+            if (index < stars) {
+                star.classList.add('active');
+            } else {
+                star.classList.remove('active');
+            }
+        });
+    };
+
+    window.sendAppFeedbackMulti = async function() {
+        // Validación: Asegurarse de que han respondido a ambas preguntas
+        if (window.appRatings.q1 === 0 || window.appRatings.q2 === 0) {
+            return window.showToast("Por favor, puntúa ambas preguntas antes de enviar.", 3000);
+        }
+        
+        try { playVibration(); } catch(e) {}
+        const text = document.getElementById('app-feedback-text').value.trim();
+        const btn = document.querySelector('#tarjeta-encuesta button');
+        btn.innerText = "ENVIANDO...";
+        
+        try {
+            let feedbackId = new Date().getTime().toString();
+            await window.setDoc(window.doc(window.db, "app_feedback", feedbackId), {
+                facilidadUso: window.appRatings.q1,
+                utilidadVideos: window.appRatings.q2,
+                comentario: text,
+                cliente: user && user.name ? user.name : "Desconocido",
+                modelo: user && user.car ? user.car.name : "N/A",
+                fecha: new Date().toLocaleString('es-ES')
+            });
+            
+            document.getElementById('tarjeta-encuesta').innerHTML = `
+                <i class="fas fa-check-circle" style="font-size: 45px; color: #a855f7; margin-bottom:15px; filter: drop-shadow(0 0 15px rgba(168,85,247,0.5));"></i>
+                <h4 style="margin:0 0 10px 0; font-size:18px; font-weight:800; color:white;">¡Mil gracias!</h4>
+                <p style="font-size:12px; font-weight:300; opacity:0.8; line-height:1.5;">Tus comentarios nos ayudan a mejorar el servicio cada día.</p>
+            `;
+            try { confetti({ particleCount: 80, spread: 70, origin: { y: 0.8 }, colors: ['#a855f7', '#c084fc', '#ffffff'] }); } catch(e) {}
+            
+        } catch(e) {
+            console.error("Error guardando encuesta:", e);
+            window.showToast("Error de conexión. Revisa los permisos de Firebase.", 4000);
+            btn.innerText = "ENVIAR OPINIÓN AL EQUIPO";
+        }
+    };
+    
+    function updateTimer() {
+        if(!user || !user.deliveryDate) return;
+        const diff = new Date(user.deliveryDate).getTime() - new Date().getTime();
+        const btnLlegada = document.getElementById('btnLlegada');
+        
+        if(diff <= 0) { 
+            const grid = document.querySelector('.pc-timer-grid');
+            if(grid) { 
+                grid.innerHTML = "<div style='grid-column: span 4; font-size: 18px; font-weight: 300; color: #25D366; padding: 10px 0; letter-spacing:1px;'>VEHÍCULO LISTO PARA ENTREGA</div>"; 
+            }
+            if (btnLlegada && !window.alertaEnviada) {
+                btnLlegada.style.display = 'flex';
+            }
+            if(window.tInt) clearInterval(window.tInt);
+            return; 
+        }
+        
+        if (btnLlegada) {
+            btnLlegada.style.display = 'none';
+        }
+
+        const elDays = document.getElementById('d-days');
+        if(elDays) {
+            elDays.innerText = Math.floor(diff / 86400000);
+            document.getElementById('d-hours').innerText = Math.floor((diff % 86400000) / 3600000);
+            document.getElementById('d-mins').innerText = Math.floor((diff % 3600000) / 60000);
+            document.getElementById('d-secs').innerText = Math.floor((diff % 60000) / 1000);
+        }
+    }
+
+    window.reveal = function() { 
+        playVibration(100);
+        document.getElementById('cover').classList.add('open'); 
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#00B0F0', '#FFFFFF', '#001E50'] }); 
+        
+        setTimeout(() => {
+            const carImg = document.getElementById('real-car-img');
+            if(carImg) carImg.classList.add('float-animation');
+        }, 1500);
+    }
+    
+    window.toggleCheck = function(e) { playVibration(30); e.classList.toggle('checked'); }
+    window.showToast = function(t, time = 3000) { var x = document.getElementById("toast"); x.className = "show"; x.innerText = t; setTimeout(()=>x.className="", time); }
+    
+    window.alertaEnviada = false;
+
+    window.notifyArrival = async function() { 
+        playVibration();
+        try {
+            let mat = user.matricula || document.getElementById('username').value;
+            if(!mat) throw new Error("Sin matrícula");
+
+            let matriculaLimpia = mat.toUpperCase().replace(/\s/g, '');
+            let docIdEncontrado = null;
+
+            const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
+            querySnapshot.forEach((doc) => {
+                const c = doc.data();
+                const matDB = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
+                const basDB = (c.bastidor || "").toUpperCase();
+                if (matDB === matriculaLimpia || basDB === matriculaLimpia) {
+                    docIdEncontrado = doc.id;
+                }
+            });
+            
+            if (docIdEncontrado) {
+                const btnLlegada = document.getElementById('btnLlegada');
+                await window.updateDoc(window.doc(window.db, "vehiculos", docIdEncontrado), { 
+                    clienteEnPuerta: true,
+                    alertaAtendida: false 
+                });
+                
+                Swal.fire({
+                    title: '¡AVISO ENVIADO!',
+                    html: '<p style="font-size:14px; font-weight:300; opacity:0.9;">Tu asesor ha sido notificado. Por favor, toma asiento y saldremos a recibirte en breves instantes.</p>',
+                    icon: 'success',
+                    iconColor: '#25D366',
+                    background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                    color: '#fff',
+                    confirmButtonColor: '#00B0F0',
+                    confirmButtonText: 'ENTENDIDO',
+                    customClass: { popup: 'border border-gray-600 rounded-3xl shadow-2xl' }
+                });
+
+                if(btnLlegada) {
+                    btnLlegada.innerHTML = '<i class="fas fa-check-circle"></i> ASESOR AVISADO';
+                    btnLlegada.style.background = 'linear-gradient(135deg, #001E50, #0044a0)';
+                    btnLlegada.style.color = '#fff';
+                    btnLlegada.style.boxShadow = 'none';
+                    btnLlegada.onclick = null; 
+                    window.alertaEnviada = true;
+                }
+            } else {
+                throw new Error("Coche no encontrado en Firebase");
+            }
+        } catch(e) { 
+            console.log("Error al notificar llegada:", e); 
+            Swal.fire({
+                title: 'ERROR DE CONEXIÓN',
+                text: 'No hemos podido notificar al asesor de forma automática debido a un fallo de red. Por favor, acércate a recepción.',
+                icon: 'error',
+                background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                color: '#fff',
+                confirmButtonColor: '#00B0F0',
+                confirmButtonText: 'ENTENDIDO'
+            });
+        }
+    }
+    
+    window.whatsappMe = function() { 
+        var t = (user && user.agente && user.agente.includes("ANTONIO")) ? "34618969208" : "34660050228"; 
+        window.open("https://wa.me/"+t); 
+    }
+
+    window.sendWishlist = function() { 
+        var t = (user && user.agente && user.agente.includes("ANTONIO")) ? "34618969208" : "34660050228";
+        window.open("https://wa.me/"+t+"?text=Interés accesorio: " + document.getElementById('wishlist').value); 
+    }
+
+    window.playQuickVideo = function(id, title) {
+        if (!esVideoValido(id)) {
+            showToast("Vídeo no disponible para este modelo", 3000);
+            return;
+        }
+        playVibration();
+        const frame = document.getElementById('video-frame');
+        if(frame) frame.src = "https://www.youtube.com/embed/" + id + "?autoplay=1";
+        showToast("Reproduciendo: " + title);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    window.downloadVWApp = function() {
+        try {
+            var ua = navigator.userAgent || navigator.vendor || window.opera;
+            if (/android/i.test(ua)) {
+                window.open('https://play.google.com/store/apps/details?id=com.volkswagen.weconnect', '_blank');
+            } else if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
+                window.open('https://apps.apple.com/es/app/volkswagen/id1517566572', '_blank');
+            } else {
+                window.open('https://www.volkswagen.es/es/conectividad/vw-connect/activacion.html', '_blank');
+            }
+        } catch(e) {}
+    }
+
+    window.abrirModificarCita = async function() {
+        if(!user) return;
+        window.modoEdicion = true;
+        
+        const snapshot = await window.getDocs(window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", user.matricula)));
+        if(!snapshot.empty) {
+            window.datosEdicion = snapshot.docs[0].data();
+        } else {
+            window.datosEdicion = { cliente: user.name, entregaVO: user.entregaVO };
+        }
+
+        let cocheParaReagendar = {
+            matricula: user.matricula,
+            modelo: user.car.name,
+            cliente: user.name,
+            entregaVO: user.entregaVO || "NO",
+            bastidor: user.car.bastidor || "S/B"
+        };
+        
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); 
+        document.getElementById('s-welcome').classList.add('active');
+        window.scrollTo(0,0);
+        window.iniciarMotorAgenda(cocheParaReagendar);
+    };
+
+    let fechaSeleccionadaParaReserva = null;
+    let horaSeleccionadaParaReserva = null;
+    let datosCocheReserva = null;
+
+    window.iniciarMotorAgenda = function(cocheData) {
+        datosCocheReserva = cocheData;
+        
+        document.getElementById('botones-inicio').style.display = 'none';
+        document.getElementById('mi-agenda-privada').style.display = 'block';
+        
+        const contenedorDias = document.getElementById('contenedor-dias-agenda');
+        contenedorDias.innerHTML = '';
+        
+        let fechaCalculo = new Date(); 
+        let diasDeMargen = 0;
+        
+        while (diasDeMargen < 2) {
+            fechaCalculo.setDate(fechaCalculo.getDate() + 1);
+            let diaSemanaMargen = fechaCalculo.getDay();
+            if (diaSemanaMargen !== 0 && diaSemanaMargen !== 6) {
+                diasDeMargen++;
+            }
+        }
+
+        let diasPintados = 0;
+        while (diasPintados < 21) {
+            fechaCalculo.setDate(fechaCalculo.getDate() + 1);
+            let diaSemana = fechaCalculo.getDay(); 
+            
+            if (diaSemana !== 0 && diaSemana !== 6) {
+                let fechaFormatoBBDD = fechaCalculo.getFullYear() + "-" + String(fechaCalculo.getMonth() + 1).padStart(2, '0') + "-" + String(fechaCalculo.getDate()).padStart(2, '0');
+                let diaAbreviado = fechaCalculo.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase();
+                let diaNumero = String(fechaCalculo.getDate()).padStart(2, '0');
+
+                contenedorDias.innerHTML += `
+                    <div onclick="mostrarHoras('${fechaFormatoBBDD}', '${diaAbreviado} ${diaNumero}')" style="scroll-snap-align: start; min-width: 75px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); border-radius: 15px; padding: 15px 10px; text-align: center; cursor: pointer; transition: 0.2s; flex-shrink: 0;" onmouseover="this.style.background='rgba(0,176,240,0.2)'; this.style.borderColor='#00B0F0'" onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='rgba(255,255,255,0.2)'">
+                        <div style="font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 800; text-transform: uppercase;">${diaAbreviado}</div>
+                        <div style="font-size: 26px; font-weight: 900; color: white; margin-top: 5px;">${diaNumero}</div>
+                    </div>
+                `;
+                diasPintados++;
+            }
+        }
+
+        if(!document.getElementById('aviso-deslizar')) {
+            contenedorDias.insertAdjacentHTML('afterend', '<div id="aviso-deslizar" style="font-size:9px; color:rgba(255,255,255,0.4); text-align:right; margin-top:5px; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Desliza para ver más fechas ➔</div>');
+        }
+    };
+
+    window.mostrarHoras = async function(fechaBBDD, textoDia) {
+        fechaSeleccionadaParaReserva = fechaBBDD;
+        document.getElementById('contenedor-horas-agenda').style.display = 'block';
+        document.getElementById('titulo-fecha-elegida').innerText = "Horas disponibles para el " + textoDia;
+        
+        const gridHoras = document.getElementById('grid-horas');
+        gridHoras.innerHTML = `<div style="grid-column: span 2; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; color: white;"></i></div>`;
+
+        try {
+            const q = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", fechaBBDD));
+            const snapshot = await window.getDocs(q);
+            
+            let conteoHoras = {};
+            snapshot.forEach(doc => { 
+                let horaCita = doc.data().hora;
+                if (!conteoHoras[horaCita]) conteoHoras[horaCita] = 0;
+                conteoHoras[horaCita]++;
+            });
+
+            const horasBase = ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
+            gridHoras.innerHTML = '';
+
+            horasBase.forEach(hora => {
+                let ocupadas = conteoHoras[hora] || 0;
+                let capacidadMaxima = (hora === '19:00') ? 1 : 2;
+
+                if (ocupadas >= capacidadMaxima) {
+                    gridHoras.innerHTML += `
+                        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); padding: 15px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: not-allowed;">
+                            <i class="fas fa-lock" style="font-size: 12px;"></i> ${hora}
+                        </div>
+                    `;
+                } else {
+                    gridHoras.innerHTML += `
+                        <button onclick="confirmarCitaFirebase('${hora}')" style="background: transparent; border: 1px solid var(--vw-light); color: var(--vw-light); padding: 15px; border-radius: 12px; text-align: center; font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: 0.2s; box-shadow: 0 0 10px rgba(0,176,240,0.1);" onmouseover="this.style.background='var(--vw-light)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--vw-light)'">
+                            <i class="far fa-clock"></i> ${hora}
+                        </button>
+                    `;
+                }
+            });
+        } catch (e) {
+            console.error("Error al cargar las horas:", e);
+            gridHoras.innerHTML = `<div style="grid-column: span 2; text-align: center; color: #ff4444; font-weight: bold; font-size: 12px;">Error de conexión. Inténtalo de nuevo.</div>`;
+        }
+    };
+
+    window.mostrarPoliticaPrivacidad = function(event) {
+        event.preventDefault();
+        Swal.fire({
+            title: 'POLÍTICA DE PRIVACIDAD',
+            html: `
+                <div style="text-align:left; font-size:12px; line-height:1.6; height:250px; overflow-y:auto; padding-right:10px; color:rgba(255,255,255,0.8);">
+                    <strong style="color:var(--vw-light);">1. Responsable:</strong> Castellana Wagen M-40.<br><br>
+                    <strong style="color:var(--vw-light);">2. Finalidad:</strong> Gestión operativa de tu cita de entrega.<br><br>
+                    <strong style="color:var(--vw-light);">3. Legitimación:</strong> Tu consentimiento expreso.<br><br>
+                    <strong style="color:var(--vw-light);">4. Destinatarios:</strong> Tus datos no serán cedidos a terceros comerciales.<br><br>
+                    <strong style="color:var(--vw-light);">5. Derechos:</strong> Puedes ejercer tus derechos físicos o digitales.
+                </div>
+            `,
+            background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+            color: '#fff',
+            confirmButtonColor: '#00b0f0',
+            confirmButtonText: 'ENTENDIDO'
+        });
+    };
+
+    window.confirmarCitaFirebase = async function(hora) {
+        horaSeleccionadaParaReserva = hora;
+        
+        if (!datosCocheReserva) {
+            Swal.fire({ title: 'Error', text: 'Los datos del vehículo se han perdido. Vuelve a iniciar.', icon: 'error', background: '#001E50', color: '#fff' })
+            .then(() => location.reload());
+            return;
+        }
+
+        let matOficial = datosCocheReserva.matricula || datosCocheReserva.Matricula || "S/M";
+        let modeloCoche = datosCocheReserva.modelo || "Vehículo";
+        let bastidorCoche = datosCocheReserva.bastidor || "S/B";
+        let fechaVisual = fechaSeleccionadaParaReserva.split('-').reverse().join('/');
+
+        let vNombre = window.modoEdicion && window.datosEdicion ? window.datosEdicion.cliente : (datosCocheReserva.cliente || '');
+        let vTlf = window.modoEdicion && window.datosEdicion && window.datosEdicion.telefono ? window.datosEdicion.telefono : '';
+        let vEmail = window.modoEdicion && window.datosEdicion && window.datosEdicion.email ? window.datosEdicion.email : '';
+        let vVO = window.modoEdicion && window.datosEdicion && window.datosEdicion.entregaVO ? window.datosEdicion.entregaVO : 'NO';
+        
+        let lockStyle = window.modoEdicion ? 'readonly style="opacity:0.6; pointer-events:none;' : 'style="';
+        let lockSelect = window.modoEdicion ? 'disabled style="opacity:0.6;' : 'style="';
+        let lockCheck = window.modoEdicion ? 'checked disabled' : '';
+
+        Swal.fire({
+            title: window.modoEdicion ? 'CONFIRMA EL CAMBIO' : 'COMPLETA TU RESERVA',
+            html: `
+                <div style="font-size:12px; font-weight:300; opacity:0.9; margin-bottom:20px; line-height:1.5; text-align:left; background:rgba(255,255,255,0.05); padding:15px; border-radius:18px; border:1px solid rgba(255,255,255,0.1);">
+                    <div style="font-size:10px; font-weight:800; color:var(--vw-light); letter-spacing:1px; margin-bottom:5px; text-transform:uppercase;">Vehículo Verificado</div>
+                    🚗 Cita para tu <b style="color:white; text-transform:uppercase;">${modeloCoche}</b><br>
+                    📌 Matrícula: <b style="color:white;">${matOficial}</b><br>
+                    📅 ${window.modoEdicion ? 'Nuevo Horario' : 'Horario'}: <b style="color:white;">${fechaVisual} a las ${horaSeleccionadaParaReserva}h</b>
+                </div>
+
+                <div style="text-align:left;">
+                    <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">Nombre y Apellidos</label>
+                    <input id="form-nombre" class="swal2-input" ${lockStyle} width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vNombre}" placeholder="Tu nombre completo">
+
+                    <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">Número de Teléfono</label>
+                    <input id="form-telefono" type="tel" class="swal2-input" ${lockStyle} width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vTlf}" placeholder="Ej: 600000000" maxlength="15">
+
+                    <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">Correo Electrónico</label>
+                    <input id="form-email" type="email" class="swal2-input" ${lockStyle} width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vEmail}" placeholder="ejemplo@correo.com">
+
+                    <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">¿Entregas un vehículo usado (VO)?</label>
+                    <select id="form-vo" class="swal2-select" ${lockSelect} width:100% !important; margin:0 0 15px 0 !important; background:#001E50; border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:13px; padding:12px; font-weight:bold;">
+                        <option value="NO" ${vVO === 'NO' ? 'selected' : ''}>NO, SOLO RECOJO EL NUEVO VOLKSWAGEN</option>
+                        <option value="SI" ${vVO === 'SI' ? 'selected' : ''}>SÍ, ENTREGO MI VEHÍCULO ANTIGUO</option>
+                    </select>
+
+                    <div style="display:flex; align-items:flex-start; gap:10px; margin-top:5px; background:rgba(0,0,0,0.2); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.1);">
+                        <input type="checkbox" id="form-lopd" ${lockCheck} style="margin-top:2px; width:18px; height:18px; cursor:pointer;">
+                        <label for="form-lopd" style="font-size:10px; color:rgba(255,255,255,0.7); line-height:1.4; text-align:left; cursor:pointer; margin:0;">
+                            He leído y acepto la <a href="#" onclick="window.mostrarPoliticaPrivacidad(event)" style="color:var(--vw-light); text-decoration:underline;">Política de Privacidad</a>.
+                        </label>
+                    </div>
+                </div>
+            `,
+            background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+            color: '#fff',
+            showCancelButton: true,
+            confirmButtonColor: '#00b0f0',
+            cancelButtonColor: 'transparent',
+            confirmButtonText: 'CONFIRMAR CITA 📅',
+            cancelButtonText: 'CANCELAR',
+            customClass: { cancelButton: 'border border-gray-500 text-gray-500', popup: 'border border-gray-600 rounded-3xl' },
+            preConfirm: () => {
+                const nombre = document.getElementById('form-nombre').value.trim();
+                const telefono = document.getElementById('form-telefono').value.trim();
+                const email = document.getElementById('form-email').value.trim();
+                const vo = document.getElementById('form-vo').value;
+                const lopd = document.getElementById('form-lopd').checked;
+
+                if (!nombre || nombre.length < 3) return Swal.showValidationMessage('Introduce tu nombre completo');
+                if (!telefono || telefono.length < 9) return Swal.showValidationMessage('Teléfono no válido');
+                if (!lopd) return Swal.showValidationMessage('Debes aceptar la Política de Privacidad');
+
+                return { nombre, telefono, email, vo };
+            }
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                const { nombre, telefono, email, vo } = result.value;
+                Swal.fire({title: 'Procesando tu reserva...', didOpen: () => Swal.showLoading(), allowOutsideClick: false, background: '#001E50', color: '#fff'});
+                
+                try {
+                    const qCheck = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", fechaSeleccionadaParaReserva));
+                    const snapCheck = await window.getDocs(qCheck);
+                    
+                    let ocupadas = 0;
+                    let agentesOcupados = [];
+                    snapCheck.forEach(doc => {
+                        let data = doc.data();
+                        if (data.hora === horaSeleccionadaParaReserva) {
+                            ocupadas++;
+                            if (data.agente) agentesOcupados.push(data.agente);
+                        }
+                    });
+
+                    let capacidadMaxima = (horaSeleccionadaParaReserva === '19:00') ? 1 : 2;
+
+                    if (ocupadas >= capacidadMaxima) {
+                        Swal.fire('¡Lo sentimos!', 'Esta hora acaba de ser reservada por otro cliente.', 'error');
+                        window.mostrarHoras(fechaSeleccionadaParaReserva, "el día seleccionado");
+                        return;
+                    }
+
+                    let agenteAsignado = "MANUEL";
+                    if (horaSeleccionadaParaReserva !== '19:00' && ocupadas === 1) {
+                        agenteAsignado = (agentesOcupados[0] === "MANUEL") ? "ANTONIO" : "MANUEL";
+                    } else if (ocupadas === 0) {
+                        agenteAsignado = Math.random() < 0.5 ? "MANUEL" : "ANTONIO";
+                    }
+
+                    const qAntigua = window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", matOficial));
+                    const snapAntigua = await window.getDocs(qAntigua);
+                    for (const docAntiguo of snapAntigua.docs) {
+                        await window.deleteDoc(window.doc(window.db, "citas_agenda", docAntiguo.id));
+                    }
+
+                    let idCita = new Date().getTime().toString();
+                    await window.setDoc(window.doc(window.db, "citas_agenda", idCita), {
+                        fecha: fechaSeleccionadaParaReserva,
+                        hora: horaSeleccionadaParaReserva,
+                        matricula: matOficial,
+                        modelo: modeloCoche,
+                        bastidor: bastidorCoche,
+                        cliente: nombre,
+                        telefono: telefono,
+                        email: email,
+                        entregaVO: vo,
+                        agente: agenteAsignado,
+                        creadoEn: new Date().toISOString(),
+                        lopdAceptada: true
+                    });
+
+                    if (datosCocheReserva.id) {
+                        await window.updateDoc(window.doc(window.db, "vehiculos", datosCocheReserva.id), {
+                            fechaCita: `${fechaVisual} - ${horaSeleccionadaParaReserva}h`,
+                            agente: agenteAsignado,
+                            cliente: nombre,
+                            entregaVO: vo
+                        });
+                    }
+                    
+                    if (email && email.includes('@')) {
+                        try {
+                            console.log("Enviando orden de correo a Google...");
+                            let accionCorreo = window.modoEdicion ? "modificar_correo" : "enviar_correo";
+                            
+                            fetch(API_URL, {
+                                method: 'POST',
+                                mode: 'no-cors', 
+                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                body: JSON.stringify({
+                                    action: accionCorreo, 
+                                    email: email, 
+                                    cliente: nombre,
+                                    modelo: modeloCoche, 
+                                    matricula: matOficial,
+                                    fecha: fechaVisual, 
+                                    hora: horaSeleccionadaParaReserva, 
+                                    agente: agenteAsignado
+                                })
+                            });
+                            
+                            window.modoEdicion = false;
+                        } catch(err) {
+                            console.error("Error en el bloque de correo:", err);
+                        }
+                    }
+
+                    Swal.fire({
+                        title: '¡CITA RESERVADA!', 
+                        html: `<div style="font-size:14px; font-weight:300;">Se ha enviado un comprobante a:<br><b style="color:var(--vw-light);">${email}</b>.<br><br>Tu especialista asignado es: <b>${agenteAsignado}</b>.</div>`, 
+                        icon: 'success', background: '#001E50', color: '#fff', confirmButtonColor: '#00b0f0'
+                    }).then(() => {
+                        document.getElementById('mi-agenda-privada').style.display = 'none';
+                        document.getElementById('botones-inicio').style.display = 'block';
+                        
+                        user = {
+                            name: nombre,
+                            car: typeof cars !== 'undefined' ? cars.find(c => modeloCoche.toUpperCase().includes(c.name.toUpperCase())) || cars[0] : {name: modeloCoche},
+                            deliveryDate: `${fechaSeleccionadaParaReserva}T${horaSeleccionadaParaReserva}:00`,
+                            agente: agenteAsignado,
+                            entregaVO: vo,
+                            matricula: matOficial
+                        };
+                        localStorage.setItem('vw_user_data', JSON.stringify(user));
+                        location.reload();
+                    });
+
+                } catch (e) {
+                    console.error("Error al procesar reserva:", e);
+                    Swal.fire('Error de Red', 'No se ha podido procesar la reserva. Revisa tu conexión.', 'error');
+                }
+            }
+        });
+    };
+</script>
+</body>
+</html>

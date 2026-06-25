@@ -1,0 +1,26 @@
+// Firestore security rules - Strict baseline for enterprise
+// Purpose: deny all client-side write access; backend using Admin SDK (service account) has full access.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default: deny all reads and writes from client SDKs
+    match /{document=**} {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // Example: allow authenticated users to read their own profile (uncomment if needed)
+    // match /users/{userId} {
+    //   allow read: if request.auth != null && request.auth.uid == userId;
+    //   allow write: if false; // writes must go through backend
+    // }
+
+    // If you need to expose a public collection, add an explicit allow read rule only for that collection.
+    // Example:
+    // match /public_info/{doc} {
+    //   allow read: if true;
+    //   allow write: if false;
+    // }
+  }
+}
