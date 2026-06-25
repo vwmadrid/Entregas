@@ -21,155 +21,37 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
 
     <script type="module">
-        // Reemplazo de Firestore en frontend por llamadas al backend (proxy)
-        // Uso Firebase Auth únicamente para obtener ID tokens y delegar las operaciones al backend.
-        
-        // 🌍 Detectar automáticamente el entorno (desarrollo vs producción)
-        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const isLocalServer = isDev && window.location.port === '5500'; // Live Server Port
-        
-        if (isLocalServer) {
-            // 💻 Desarrollo local: conectar al backend en localhost:3000
-            window.API_BASE = 'http://localhost:3000';
-        } else if (isDev) {
-            // 💻 Desarrollo (otro puerto): intentar localhost:3000
-            window.API_BASE = 'http://localhost:3000';
-        } else {
-            // 🚀 Producción: si el frontend está en Vercel, usa el mismo origen para el backend.
-            if (window.location.hostname.endsWith('.vercel.app')) {
-                window.API_BASE = window.location.origin;
-            } else {
-                window.API_BASE = 'https://gescar-backend.vercel.app';
-            }
-        }
-        
-        console.log('🌍 Entorno:', isDev ? 'DESARROLLO' : 'PRODUCCIÓN');
-        console.log('📍 API Base:', window.API_BASE);
-
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, getDocs, query, where, updateDoc, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCRfERugbIVfAXtKa7mGdLLTm6xwxb5wlE",
             authDomain: "gestion-flotas-vw.firebaseapp.com",
-            projectId: "gestion-flotas-vw"
+            projectId: "gestion-flotas-vw",
+            storageBucket: "gestion-flotas-vw.firebasestorage.app",
+            messagingSenderId: "1070891769268",
+            appId: "1:1070891769268:web:47b04e6d62e576038966e1"
         };
 
         try {
-            const _app = initializeApp(firebaseConfig);
-            const _auth = getAuth(_app);
-            onAuthStateChanged(_auth, (u) => {
-                if (!u) {
-                    try { signInAnonymously(_auth).catch(e=>console.error('Anon signIn failed', e)); } catch(e){}
-                }
-            });
-            window.getIdToken = async function() {
-                try {
-                    if (!_auth.currentUser) await signInAnonymously(_auth);
-                    const user = _auth.currentUser;
-                    if (!user) return null;
-                    return await user.getIdToken();
-                } catch (e) { console.error('getIdToken error', e); return null; }
-            };
-        } catch (e) { console.error('Firebase Auth init failed', e); }
-
-        // Helper para llamadas al backend con token
-        async function sendApi(path, method='POST', body=null) {
-            const headers = { 'Content-Type': 'application/json' };
-            const token = (window.getIdToken) ? await window.getIdToken() : null;
-            if (token) headers['Authorization'] = 'Bearer ' + token;
-            const opts = { method, headers };
-            if (body) opts.body = JSON.stringify(body);
-            const res = await fetch(window.API_BASE + path, opts);
-            const ct = res.headers.get('content-type') || '';
-            if (ct.includes('application/json')) return res.json();
-            return res.text();
+            const app = initializeApp(firebaseConfig);
+            window.db = getFirestore(app);
+            
+            // Asignamos las herramientas nativas a la ventana global
+            window.collection = collection; 
+            window.getDocs = getDocs; 
+            window.query = query; 
+            window.where = where;
+            window.updateDoc = updateDoc;
+            window.setDoc = setDoc;
+            window.deleteDoc = deleteDoc;
+            window.onSnapshot = onSnapshot; 
+            window.doc = doc;
+            
+            console.log("🟢 Conexión directa a Firebase establecida correctamente.");
+        } catch (error) {
+            console.error("🔥 Error crítico al cargar Firebase:", error);
         }
-
-        // Shims compatibles con el código existente que usaba la API de Firestore
-        window.collection = function(_db, name) { return { __collection: name }; };
-        window.doc = function(_db, coll, id) {
-            // soporta doc(window.db, 'vehiculos', id) o doc(window.db, 'vehiculos')
-            if (id === undefined) return { __collection: coll, __id: null };
-            return { __collection: coll, __id: id };
-        };
-        window.where = function(field, op, value) { return { __where: { field, op, value } }; };
-        window.query = function(collectionObj, whereObj) { return { __collection: collectionObj && collectionObj.__collection, __where: whereObj && whereObj.__where }; };
-
-        window.getDocs = async function(q) {
-            if (!q || !q.__collection) return { empty: true, docs: [], forEach: () => {} };
-            if (q.__collection === 'vehiculos') {
-                if (q.__where && (q.__where.field === 'matricula' || q.__where.field === 'bastidor')) {
-                    const resp = await sendApi('/api/vehiculos/buscar', 'POST', { q: q.__where.value });
-                    const results = resp.results || [];
-                    const docs = results.map(r => ({ id: r.id, data: () => r }));
-                    return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
-                }
-                const resp = await sendApi('/api/vehiculos/all', 'GET');
-                const results = resp.results || [];
-                const docs = results.map(r => ({ id: r.id, data: () => r }));
-                return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
-            }
-            if (q.__collection === 'citas_agenda') {
-                if (q.__where) {
-                    const resp = await sendApi('/api/citas/query', 'POST', { field: q.__where.field, value: q.__where.value });
-                    const results = resp.results || [];
-                    const docs = results.map(r => ({ id: r.id, data: () => r }));
-                    return { empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(d => fn({ id: d.id, data: d.data })), map: (fn) => docs.map(fn) };
-                }
-            }
-            return { empty: true, docs: [], forEach: () => {} };
-        };
-
-        window.setDoc = async function(docRef, data) {
-            if (!docRef || !docRef.__collection) return null;
-            if (docRef.__collection === 'app_feedback') {
-                if (docRef.__id) return sendApi('/api/feedback/create', 'POST', { id: docRef.__id, data });
-                return sendApi('/api/feedback/create', 'POST', { data });
-            }
-            if (docRef.__collection === 'citas_agenda') {
-                return sendApi('/api/citas/set', 'POST', { id: docRef.__id, data });
-            }
-            return sendApi(`/api/${docRef.__collection}/set`, 'POST', { id: docRef.__id, data });
-        };
-
-        window.updateDoc = async function(docRef, data) {
-            if (!docRef || !docRef.__collection) return null;
-            if (docRef.__collection === 'vehiculos') return sendApi('/api/vehiculos/update', 'POST', { id: docRef.__id, data });
-            if (docRef.__collection === 'citas_agenda') return sendApi('/api/citas/update', 'POST', { id: docRef.__id, data });
-            return sendApi(`/api/${docRef.__collection}/update`, 'POST', { id: docRef.__id, data });
-        };
-
-        window.deleteDoc = async function(docRef) {
-            if (!docRef || !docRef.__collection) return null;
-            if (docRef.__collection === 'citas_agenda') return sendApi('/api/citas/delete', 'POST', { id: docRef.__id });
-            return sendApi(`/api/${docRef.__collection}/delete`, 'POST', { id: docRef.__id });
-        };
-
-        // onSnapshot: implementa polling sencillo en desarrollo (dev only)
-        window.onSnapshot = function(target, onNext, onError) {
-            let stopped = false;
-            const poll = async () => {
-                try {
-                    if (stopped) return;
-                    if (target && target.__id) {
-                        // buscar documento por id en la colección (fallback usando /all)
-                        const resp = await sendApi(`/api/${target.__collection}/all`, 'GET');
-                        const doc = (resp.results || []).find(r => r.id === target.__id);
-                        const docs = doc ? [{ id: doc.id, data: () => doc }] : [];
-                        onNext({ empty: docs.length === 0, docs });
-                    } else {
-                        const snap = await window.getDocs(target);
-                        onNext(snap);
-                    }
-                } catch (e) {
-                    if (onError) onError(e);
-                }
-                if (!stopped) setTimeout(poll, 3000);
-            };
-            poll();
-            return () => { stopped = true; };
-        };
     </script>
 
     <style>
@@ -281,7 +163,7 @@
         .btn-checkin { background: linear-gradient(135deg, #11998e, #38ef7d); color: #000; border: none; padding: 18px; border-radius: 50px; font-weight: 800; width: 100%; margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3); }
         .btn-checkin:active { transform: scale(0.98); }
 
-       .app-survey-card { margin-top: 30px; padding: 25px; border-radius: 25px; text-align: center; background: linear-gradient(145deg, rgba(30, 45, 75, 0.4) 0%, rgba(10, 15, 30, 0.6) 100%); border: 1px solid rgba(168, 85, 247, 0.4); position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .app-survey-card { margin-top: 30px; padding: 25px; border-radius: 25px; text-align: center; background: linear-gradient(145deg, rgba(30, 45, 75, 0.4) 0%, rgba(10, 15, 30, 0.6) 100%); border: 1px solid rgba(168, 85, 247, 0.4); position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
         .survey-badge { position: absolute; top: 0; right: 0; background: rgba(168, 85, 247, 0.2); color: #c084fc; font-size: 8px; font-weight: 900; padding: 5px 12px; border-bottom-left-radius: 15px; letter-spacing: 1px; text-transform: uppercase; }
         .star-rating { display: flex; justify-content: center; gap: 12px; color: rgba(255,255,255,0.15); font-size: 32px; cursor: pointer; margin: 15px 0; }
         .star-rating i.active { color: #FFD700; filter: drop-shadow(0 0 8px rgba(255,215,0,0.6)); transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1); transform: scale(1.1); }
@@ -388,10 +270,9 @@
         
         <div id="status-widget"></div>
 
-       <!-- Enlace sutil para modificar cita integrado bajo el reloj -->
         <div id="linkModificarCita" onclick="abrirModificarCita()" style="text-align: center; font-size: 11px; font-weight: 400; color: rgba(255,255,255,0.4); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; margin-top: -10px; margin-bottom: 25px; letter-spacing: 0.5px; transition: color 0.3s ease;" onmouseover="this.style.color='var(--vw-light)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">
-    <i class="fas fa-pencil-alt" style="margin-right: 5px;"></i> ¿Necesitas modificar tu fecha de entrega?
-</div>
+            <i class="fas fa-pencil-alt" style="margin-right: 5px;"></i> ¿Necesitas modificar tu fecha de entrega?
+        </div>
         
         <div class="reveal-container" id="car-stage" onclick="reveal()">
             <div class="blue-cover" id="cover">
@@ -406,7 +287,7 @@
             * Imagen orientativa con fines ilustrativos. Puede no corresponder exactamente a tu unidad.
         </div>
         
-        <button id="btnLlegada" class="btn-checkin" style="display: none;" onclick="playVibration(); notifyArrival()"><i class="fas fa-map-marker-alt"></i> YA ESTOY EN EL CONCESIONARIO</button>
+        <button id="btnLlegada" class="btn-checkin" style="display: none;" onclick="notifyArrival()"><i class="fas fa-map-marker-alt"></i> YA ESTOY EN EL CONCESIONARIO</button>
         
         <div class="section-title">SERVICIOS DIGITALES</div>
         
@@ -744,17 +625,14 @@
 </div>
 
 <script>
-    /**
-     * @project GesCar OS - Lógica de Cliente
-     */
-    const API_URL = "https://script.google.com/macros/s/AKfycbxQ5mMCC7DA0wrlpaZS6EksUAIkoDgwceIcFObevEXei8mzEw1WVfOzgKdrqBIi76p-CQ/exec";
-
     window.escapeJS = function(str) {
         return String(str || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;");
     };
 
+    const API_URL = atob("aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4UTVtTUNDN0RBMHdybHBhWlM2RWtzVUFJa29EZ3djZUljRk9iZXZFWGVpOG16RXcxV1ZmT3pnS2RycUJJaTc2cC1DUS9leGVj");
+    
     function escapeHtml(str) {
-        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return String(str || '').replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>').replace(/"/g, '"');
     }
 
     function escapeForJsString(str) {
@@ -1299,7 +1177,6 @@
                             enConcesionario = true;
                         }
                         
-                        // 🔥 NUEVO: Detectamos si ya tiene una fecha de cita guardada
                         if (c.fechaCita && c.fechaCita.trim() !== "") {
                             yaTieneCita = true;
                             fechaExistente = c.fechaCita;
@@ -1307,7 +1184,6 @@
                     }
                 });
 
-                // 🔥 NUEVO BLOQUEO: Si ya tiene cita, no le dejamos continuar
                 if (encontrado && yaTieneCita) {
                     Swal.fire({
                         title: 'CITA YA RESERVADA',
@@ -1386,7 +1262,6 @@
 
            if (encontrado) {
                 const cocheF = encontrado.data;
-                // 🔥 NUEVO BLOQUEO: Si no tiene cita y no está entregado, no pasa
                 let estaEntregado = (cocheF.entregado === true || cocheF.entregado === "true");
                 
                 if (!cocheF.fechaCita && !estaEntregado) {
@@ -1401,7 +1276,7 @@
                         customClass: { popup: 'border border-gray-600 rounded-3xl' }
                     });
                     btn.innerText = "ACCEDER";
-                    return; // Cortamos el proceso aquí
+                    return; 
                 }
 
                 user = buildUserFromVehiculo(cocheF, mat, null);
