@@ -236,24 +236,72 @@ window.mostrarHoras = async function(fechaBBDD, textoDia) {
     gridHoras.innerHTML = `<div style="grid-column: span 2; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; color: white;"></i></div>`;
 
     try {
+        // 1. Cargamos las citas existentes
         const q = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", fechaBBDD));
-        const snapshot = await window.getDocs(q);
+        const snapshotCitas = await window.getDocs(q);
         
         let conteoHoras = {};
-        snapshot.forEach(doc => { 
+        snapshotCitas.forEach(doc => { 
             let horaCita = doc.data().hora;
             if (!conteoHoras[horaCita]) conteoHoras[horaCita] = 0;
             conteoHoras[horaCita]++;
         });
 
+        // 🔥 2. RADAR DE BLOQUEOS Y VACACIONES (Nuevo)
+        const snapshotBloqueos = await window.getDocs(window.collection(window.db, "bloqueos_agenda"));
+        let ausenciasDia = { MANUEL: false, ANTONIO: false, AMBOS: false };
+        let ausenciasHora = {}; 
+
+        snapshotBloqueos.forEach(doc => {
+            let b = doc.data();
+            
+            // Si es un día de vacaciones entero
+            if (b.tipo === "vacaciones" && fechaBBDD >= b.fechaInicio && fechaBBDD <= b.fechaFin) {
+                ausenciasDia[b.operarioAfectado] = true;
+            } 
+            // Si es una hora suelta o un rango de horas
+            else if (b.tipo === "hora_suelta" && fechaBBDD === b.fechaInicio) {
+                const horasArray = ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
+                horasArray.forEach(h => {
+                    // Calculamos si la hora actual choca con el inicio o fin del bloqueo
+                    if(h >= b.horaInicio && h <= b.horaFin) {
+                        if (!ausenciasHora[h]) ausenciasHora[h] = [];
+                        ausenciasHora[h].push(b.operarioAfectado);
+                    }
+                });
+            }
+        });
+
+        // 3. Pintamos los botones calculando la disponibilidad real
         const horasBase = ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
         gridHoras.innerHTML = '';
 
         horasBase.forEach(hora => {
             let ocupadas = conteoHoras[hora] || 0;
-            let capacidadMaxima = (hora === '19:00') ? 1 : 2;
+            let capacidadMaxima = (hora === '19:00') ? 1 : 2; // Capacidad base (2 agentes, excepto a las 19:00h)
 
-            if (ocupadas >= capacidadMaxima) {
+            // 🛑 Restamos capacidad si están de vacaciones todo el día
+            if (ausenciasDia['AMBOS']) capacidadMaxima = 0;
+            else {
+                if (ausenciasDia['MANUEL']) capacidadMaxima--;
+                if (ausenciasDia['ANTONIO']) capacidadMaxima--;
+            }
+
+            // 🛑 Restamos capacidad si tienen esa hora bloqueada por médico, curso, etc.
+            if (ausenciasHora[hora]) {
+                if (ausenciasHora[hora].includes('AMBOS')) capacidadMaxima = 0;
+                else {
+                    if (ausenciasHora[hora].includes('MANUEL')) capacidadMaxima--;
+                    if (ausenciasHora[hora].includes('ANTONIO')) capacidadMaxima--;
+                }
+            }
+
+            // Control de seguridad (nunca bajar de 0) y regla estricta para las 19:00h
+            if (capacidadMaxima < 0) capacidadMaxima = 0;
+            if (hora === '19:00' && capacidadMaxima > 1) capacidadMaxima = 1;
+
+            // 4. Decidimos qué botón pintar (Abierto o Cerrado)
+            if (ocupadas >= capacidadMaxima || capacidadMaxima === 0) {
                 gridHoras.innerHTML += `
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); padding: 15px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: not-allowed;">
                         <i class="fas fa-lock" style="font-size: 12px;"></i> ${hora}
