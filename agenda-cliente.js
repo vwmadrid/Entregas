@@ -64,19 +64,49 @@ window.verificarVehiculoParaCita = async function() {
         });
 
         try {
-            const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
+            // 🔥 1. PREPARACIÓN DE VARIANTES DE BÚSQUEDA
+            // El input ya viene sin espacios desde el preConfirm (Ej: "1234ABC")
+            let matLimpia = matriculaInput; 
+            let matConEspacio = matLimpia;
+            
+            // Si el cliente metió una matrícula estándar (4 números + 3 letras), preparamos la versión con espacio (Ej: "1234 ABC")
+            if (/^\d{4}[A-Z]{3}$/.test(matLimpia)) {
+                matConEspacio = matLimpia.substring(0,4) + ' ' + matLimpia.substring(4);
+            }
+
+            const vehRef = window.collection(window.db, "vehiculos");
+            
+            // 🔥 2. BÚSQUEDA DE FRANCOTIRADOR
+            // Preparamos las consultas exactas al servidor para no descargar la base de datos entera
+            const busquedas = [
+                window.getDocs(window.query(vehRef, window.where("matricula", "==", matLimpia))),
+                window.getDocs(window.query(vehRef, window.where("Matricula", "==", matLimpia))),
+                window.getDocs(window.query(vehRef, window.where("bastidor", "==", matLimpia)))
+            ];
+
+            // Si hay versión con espacio, la añadimos a los disparos
+            if (matConEspacio !== matLimpia) {
+                busquedas.push(window.getDocs(window.query(vehRef, window.where("matricula", "==", matConEspacio))));
+                busquedas.push(window.getDocs(window.query(vehRef, window.where("Matricula", "==", matConEspacio))));
+            }
+
+            // Ejecutamos todos los disparos a la vez (muchísimo más rápido y barato)
+            const resultados = await Promise.all(busquedas);
+
             let encontrado = false;
             let enConcesionario = false;
             let yaTieneCita = false;
             let fechaExistente = "";
             let cocheEncontradoParaCita = null;
 
-            querySnapshot.forEach((doc) => {
-                const c = doc.data();
-                const mat = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
-                const bas = (c.bastidor || "").toUpperCase();
+            // 🔥 3. PROCESAMIENTO EXCLUSIVO DE LOS RESULTADOS
+            resultados.forEach(querySnapshot => {
+                querySnapshot.forEach((doc) => {
+                    const c = doc.data();
+                    
+                    // Si el coche ya fue entregado en el pasado, lo ignoramos para que no pueda volver a pedir cita
+                    if (c.entregado === true || c.entregado === "true") return;
 
-                if ((mat === matriculaInput || bas === matriculaInput) && (c.entregado !== true && c.entregado !== "true")) {
                     encontrado = true;
                     cocheEncontradoParaCita = c;
                     cocheEncontradoParaCita.id = doc.id; 
@@ -89,9 +119,12 @@ window.verificarVehiculoParaCita = async function() {
                         yaTieneCita = true;
                         fechaExistente = c.fechaCita;
                     }
-                }
+                });
             });
 
+            // ==========================================
+            // RESTO DE TU LÓGICA DE ALERTAS (INTACTA)
+            // ==========================================
             if (encontrado && yaTieneCita) {
                 Swal.fire({
                     title: 'CITA YA RESERVADA',
@@ -236,72 +269,24 @@ window.mostrarHoras = async function(fechaBBDD, textoDia) {
     gridHoras.innerHTML = `<div style="grid-column: span 2; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; color: white;"></i></div>`;
 
     try {
-        // 1. Cargamos las citas existentes
         const q = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", fechaBBDD));
-        const snapshotCitas = await window.getDocs(q);
+        const snapshot = await window.getDocs(q);
         
         let conteoHoras = {};
-        snapshotCitas.forEach(doc => { 
+        snapshot.forEach(doc => { 
             let horaCita = doc.data().hora;
             if (!conteoHoras[horaCita]) conteoHoras[horaCita] = 0;
             conteoHoras[horaCita]++;
         });
 
-        // 🔥 2. RADAR DE BLOQUEOS Y VACACIONES (Nuevo)
-        const snapshotBloqueos = await window.getDocs(window.collection(window.db, "bloqueos_agenda"));
-        let ausenciasDia = { MANUEL: false, ANTONIO: false, AMBOS: false };
-        let ausenciasHora = {}; 
-
-        snapshotBloqueos.forEach(doc => {
-            let b = doc.data();
-            
-            // Si es un día de vacaciones entero
-            if (b.tipo === "vacaciones" && fechaBBDD >= b.fechaInicio && fechaBBDD <= b.fechaFin) {
-                ausenciasDia[b.operarioAfectado] = true;
-            } 
-            // Si es una hora suelta o un rango de horas
-            else if (b.tipo === "hora_suelta" && fechaBBDD === b.fechaInicio) {
-                const horasArray = ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
-                horasArray.forEach(h => {
-                    // Calculamos si la hora actual choca con el inicio o fin del bloqueo
-                    if(h >= b.horaInicio && h <= b.horaFin) {
-                        if (!ausenciasHora[h]) ausenciasHora[h] = [];
-                        ausenciasHora[h].push(b.operarioAfectado);
-                    }
-                });
-            }
-        });
-
-        // 3. Pintamos los botones calculando la disponibilidad real
         const horasBase = ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
         gridHoras.innerHTML = '';
 
         horasBase.forEach(hora => {
             let ocupadas = conteoHoras[hora] || 0;
-            let capacidadMaxima = (hora === '19:00') ? 1 : 2; // Capacidad base (2 agentes, excepto a las 19:00h)
+            let capacidadMaxima = (hora === '19:00') ? 1 : 2;
 
-            // 🛑 Restamos capacidad si están de vacaciones todo el día
-            if (ausenciasDia['AMBOS']) capacidadMaxima = 0;
-            else {
-                if (ausenciasDia['MANUEL']) capacidadMaxima--;
-                if (ausenciasDia['ANTONIO']) capacidadMaxima--;
-            }
-
-            // 🛑 Restamos capacidad si tienen esa hora bloqueada por médico, curso, etc.
-            if (ausenciasHora[hora]) {
-                if (ausenciasHora[hora].includes('AMBOS')) capacidadMaxima = 0;
-                else {
-                    if (ausenciasHora[hora].includes('MANUEL')) capacidadMaxima--;
-                    if (ausenciasHora[hora].includes('ANTONIO')) capacidadMaxima--;
-                }
-            }
-
-            // Control de seguridad (nunca bajar de 0) y regla estricta para las 19:00h
-            if (capacidadMaxima < 0) capacidadMaxima = 0;
-            if (hora === '19:00' && capacidadMaxima > 1) capacidadMaxima = 1;
-
-            // 4. Decidimos qué botón pintar (Abierto o Cerrado)
-            if (ocupadas >= capacidadMaxima || capacidadMaxima === 0) {
+            if (ocupadas >= capacidadMaxima) {
                 gridHoras.innerHTML += `
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); padding: 15px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: not-allowed;">
                         <i class="fas fa-lock" style="font-size: 12px;"></i> ${hora}
