@@ -469,6 +469,7 @@ window.confirmarCitaFirebase = async function(hora) {
                     });
                 }
                 
+                // 🔥 AQUÍ ESTÁ EL BLOQUE DE CORREO ORIGINAL RESTAURADO
                 if (email && email.includes('@')) {
                     try {
                         let accionCorreo = window.modoEdicion ? "modificar_correo" : "enviar_correo";

@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 🔒 FUNCIÓN: Comprueba si es un empleado logueado en GesCar OS
+    function estaLogueado() {
+      return request.auth != null;
+    }
+
+    // ====================================================
+    // 🟢 ZONA PÚBLICA (Ventanilla para la App de Clientes)
+    // ====================================================
+    
+    match /vehiculos/{vehicleId} {
+      allow read: if true; 
+      allow create, delete: if estaLogueado(); // Solo empleados crean o borran coches
+      
+      // 🔥 REGLA QUIRÚRGICA: El cliente solo puede editar su cita en el vehículo
+      allow update: if estaLogueado() || 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fechaCita', 'agente', 'cliente', 'entregaVO']);
+    }
+
+    match /citas_agenda/{appointmentId} {
+      allow read: if true; 
+      // 🟢 Permitimos "create" y "delete" para que el cliente pueda agendar y modificar (borrar antigua + crear nueva)
+      allow create, delete: if true; 
+      allow update: if estaLogueado(); // Solo empleados modifican directamente el documento
+    }
+
+    match /bloqueos_agenda/{blockId} {
+      allow read: if true; 
+      allow write: if estaLogueado(); 
+    }
+
+    match /app_feedback/{feedbackId} {
+      allow create: if true; 
+      allow read, update, delete: if estaLogueado(); 
+    }
+
+    // ====================================================
+    // 🔴 ZONA PRIVADA (Solo Empleados Autenticados)
+    // ====================================================
+
+    match /credenciales/{role} {
+      allow read: if estaLogueado();
+      allow write: if false; 
+    }
+
+    match /chat_concesionario/{mensajeId} {
+      allow read, write: if estaLogueado();
+    }
+
+    match /m2_estadisticas/{docId} {
+      allow read, write: if estaLogueado();
+    }
+
+    // 🛑 Regla de cierre de seguridad estricto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
