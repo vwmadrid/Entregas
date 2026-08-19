@@ -477,33 +477,51 @@ window.mostrarHoras = async function(fechaBBDD, textoDia) {
 
     try {
         const { citas, bloqueos } = await cargarDatosDia(fechaBBDD);
-
         const horasBase = ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
-        const horasOcupadas = new Set();
 
+        // 🔥 MODIFICADO: Matemáticas de ocupación perfectas (2 sillas por hora)
+        const ocupacionPorAgente = {};
         citas.forEach(cita => {
             const horaCita = normalizarHoraHHMM(cita.hora);
             if (!horaCita) return;
-            const fechaCita = normalizarFechaIso(cita.fecha || cita.fechaCita || cita.fechaProgramada || "");
-            if (fechaCita && fechaCita !== fechaBBDD) return;
-            horasOcupadas.add(horaCita);
+            
+            if (!ocupacionPorAgente[horaCita]) ocupacionPorAgente[horaCita] = { MANUEL: 0, ANTONIO: 0, SIN_ASIGNAR: 0 };
+            
+            const ag = normalizarTextoPlano(cita.agente || cita.entregador || "");
+            if (ag === 'MANUEL') ocupacionPorAgente[horaCita].MANUEL++;
+            else if (ag === 'ANTONIO') ocupacionPorAgente[horaCita].ANTONIO++;
+            else ocupacionPorAgente[horaCita].SIN_ASIGNAR++; // Si hay citas viejas sin agente, ocupan un comodín
         });
 
         gridHoras.innerHTML = '';
 
         horasBase.forEach(hora => {
-            const agentesLibres = ['MANUEL', 'ANTONIO'].filter((agente) => !bloqueos.some((bloqueo) => bloqueoAfectaHora(bloqueo, fechaBBDD, hora, agente)));
-            const bloqueado = agentesLibres.length === 0;
-            const ocupado = horasOcupadas.has(hora);
-            const completo = bloqueado || ocupado;
+            const ocupHora = ocupacionPorAgente[hora] || { MANUEL: 0, ANTONIO: 0, SIN_ASIGNAR: 0 };
+            
+            // ¿Tienen bloqueos personales (vacaciones/horas sueltas)?
+            let mBloqueado = bloqueos.some(b => bloqueoAfectaHora(b, fechaBBDD, hora, 'MANUEL'));
+            let aBloqueado = bloqueos.some(b => bloqueoAfectaHora(b, fechaBBDD, hora, 'ANTONIO'));
+            
+            // Calculamos huecos reales (0 si está bloqueado, si no, restamos las citas que ya tiene)
+            let huecosManuel = mBloqueado ? 0 : Math.max(0, 1 - ocupHora.MANUEL);
+            let huecosAntonio = aBloqueado ? 0 : Math.max(0, 1 - ocupHora.ANTONIO);
+            
+            if (hora === '19:00') {
+                huecosAntonio = 0; // A las 19:00 solo trabaja Manuel
+            }
+            
+            // Los huecos totales menos las citas que no tienen agente asignado todavía
+            let huecosTotales = huecosManuel + huecosAntonio - ocupHora.SIN_ASIGNAR;
 
-            if (completo) {
+            if (huecosTotales <= 0) {
+                // BLOQUEADO: Si hay 0 huecos, pintamos el candado
                 gridHoras.innerHTML += `
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); padding: 15px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: not-allowed;">
                         <i class="fas fa-lock" style="font-size: 12px;"></i> ${hora}
                     </div>
                 `;
             } else {
+                // LIBRE: Si queda 1 o 2 huecos, permitimos hacer clic
                 gridHoras.innerHTML += `
                     <button onclick="confirmarCitaFirebase('${hora}')" style="background: transparent; border: 1px solid var(--vw-light); color: var(--vw-light); padding: 15px; border-radius: 12px; text-align: center; font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: 0.2s; box-shadow: 0 0 10px rgba(0,176,240,0.1);" onmouseover="this.style.background='var(--vw-light)'; this.style.color='white'" onmouseout="this.style.background='transparent'; this.style.color='var(--vw-light)'">
                         <i class="far fa-clock"></i> ${hora}
@@ -559,8 +577,8 @@ window.confirmarCitaFirebase = async function(hora) {
     let vEmail = window.modoEdicion && window.datosEdicion && window.datosEdicion.email ? window.datosEdicion.email : (usuarioActual.email || '');
     let vVO = window.modoEdicion && window.datosEdicion && window.datosEdicion.entregaVO ? window.datosEdicion.entregaVO : 'NO';
     
-    let lockStyle = window.modoEdicion ? 'readonly style="opacity:0.6; pointer-events:none;' : 'style="';
-    let lockSelect = window.modoEdicion ? 'disabled style="opacity:0.6;' : 'style="';
+    let lockStyle = window.modoEdicion ? 'readonly style="opacity:0.6; pointer-events:none;"' : '';
+    let lockSelect = window.modoEdicion ? 'disabled style="opacity:0.6;"' : '';
     let lockCheck = window.modoEdicion ? 'checked disabled' : '';
 
     Swal.fire({
@@ -575,16 +593,16 @@ window.confirmarCitaFirebase = async function(hora) {
 
             <div style="text-align:left;">
                 <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">Nombre y Apellidos</label>
-                <input id="form-nombre" class="swal2-input" ${lockStyle} width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vNombre}" placeholder="Tu nombre completo">
+                <input id="form-nombre" class="swal2-input" ${lockStyle} style="width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vNombre}" placeholder="Tu nombre completo">
 
                 <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">Número de Teléfono</label>
-                <input id="form-telefono" type="tel" class="swal2-input" ${lockStyle} width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vTlf}" placeholder="Ej: 600000000" maxlength="15">
+                <input id="form-telefono" type="tel" class="swal2-input" ${lockStyle} style="width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vTlf}" placeholder="Ej: 600000000" maxlength="15">
 
                 <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">Correo Electrónico</label>
-                <input id="form-email" type="email" class="swal2-input" ${lockStyle} width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vEmail}" placeholder="ejemplo@correo.com">
+                <input id="form-email" type="email" class="swal2-input" ${lockStyle} style="width:100% !important; margin:0 0 15px 0 !important; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:14px; padding:12px;" value="${vEmail}" placeholder="ejemplo@correo.com">
 
                 <label style="display:block; font-size:10px; font-weight:800; color:rgba(255,255,255,0.5); margin-bottom:5px; text-transform:uppercase;">¿Entregas un vehículo usado (VO)?</label>
-                <select id="form-vo" class="swal2-select" ${lockSelect} width:100% !important; margin:0 0 15px 0 !important; background:#001E50; border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:13px; padding:12px; font-weight:bold;">
+                <select id="form-vo" class="swal2-select" ${lockSelect} style="width:100% !important; margin:0 0 15px 0 !important; background:#001E50; border:1px solid rgba(255,255,255,0.2); color:white; border-radius:12px; font-size:13px; padding:12px; font-weight:bold;">
                     <option value="NO" ${vVO === 'NO' ? 'selected' : ''}>NO, SOLO RECOJO EL NUEVO VOLKSWAGEN</option>
                     <option value="SI" ${vVO === 'SI' ? 'selected' : ''}>SÍ, ENTREGO MI VEHÍCULO ANTIGUO</option>
                 </select>
@@ -627,21 +645,49 @@ window.confirmarCitaFirebase = async function(hora) {
                 await window.ensureFirebaseAuth();
                 const { citas, bloqueos } = await cargarDatosDia(window.fechaSeleccionadaParaReserva);
                 const horaReserva = normalizarHoraHHMM(window.horaSeleccionadaParaReserva);
-                const ocupada = citas.some((cita) => {
+                
+                // 🔥 MODIFICADO: Verificación final de seguridad al escribir en BBDD
+                const ocupHoraConfirm = { MANUEL: 0, ANTONIO: 0, SIN_ASIGNAR: 0 };
+                citas.forEach((cita) => {
                     const horaCita = normalizarHoraHHMM(cita.hora);
-                    const fechaCita = normalizarFechaIso(cita.fecha || cita.fechaCita || cita.fechaProgramada || "");
-                    return fechaCita === window.fechaSeleccionadaParaReserva && horaCita === horaReserva;
+                    if (horaCita !== horaReserva) return;
+                    const ag = normalizarTextoPlano(cita.agente || cita.entregador || "");
+                    if (ag === 'MANUEL') ocupHoraConfirm.MANUEL++;
+                    else if (ag === 'ANTONIO') ocupHoraConfirm.ANTONIO++;
+                    else ocupHoraConfirm.SIN_ASIGNAR++;
                 });
-                const agentesLibres = ['MANUEL', 'ANTONIO'].filter((agente) => !bloqueos.some((bloqueo) => bloqueoAfectaHora(bloqueo, window.fechaSeleccionadaParaReserva, window.horaSeleccionadaParaReserva, agente)));
-                const bloqueado = agentesLibres.length === 0;
 
-                if (ocupada || bloqueado) {
+                let mBloqueado = bloqueos.some(b => bloqueoAfectaHora(b, window.fechaSeleccionadaParaReserva, horaReserva, 'MANUEL'));
+                let aBloqueado = bloqueos.some(b => bloqueoAfectaHora(b, window.fechaSeleccionadaParaReserva, horaReserva, 'ANTONIO'));
+                
+                let huecosManuel = mBloqueado ? 0 : Math.max(0, 1 - ocupHoraConfirm.MANUEL);
+                let huecosAntonio = aBloqueado ? 0 : Math.max(0, 1 - ocupHoraConfirm.ANTONIO);
+                
+                if (horaReserva === '19:00') {
+                    huecosAntonio = 0; // A las 19:00 solo trabaja Manuel
+                }
+                
+                let huecosTotales = huecosManuel + huecosAntonio - ocupHoraConfirm.SIN_ASIGNAR;
+
+                if (huecosTotales <= 0) {
                     Swal.fire('¡Lo sentimos!', 'Esta hora acaba de estar ocupada o está bloqueada en la agenda.', 'error');
                     window.mostrarHoras(window.fechaSeleccionadaParaReserva, "el día seleccionado");
                     return;
                 }
 
-                const agenteAsignado = agentesLibres[Math.floor(Math.random() * agentesLibres.length)];
+                // 🔥 MODIFICADO: Asignación inteligente del agente que quede libre
+                let agenteAsignado = "MANUEL";
+                if (horaReserva === '19:00') {
+                    agenteAsignado = "MANUEL";
+                } else {
+                    if (huecosManuel > 0 && huecosAntonio > 0) {
+                        agenteAsignado = Math.random() < 0.5 ? "MANUEL" : "ANTONIO";
+                    } else if (huecosManuel > 0) {
+                        agenteAsignado = "MANUEL";
+                    } else {
+                        agenteAsignado = "ANTONIO";
+                    }
+                }
 
                 let idCita = window.citaEdicionId || new Date().getTime().toString();
                 const citaPayload = {
@@ -692,7 +738,6 @@ window.confirmarCitaFirebase = async function(hora) {
                     });
                 }
                 
-                // 🔥 AQUÍ ESTÁ EL BLOQUE DE CORREO ORIGINAL RESTAURADO
                 if (email && email.includes('@')) {
                     try {
                         let accionCorreo = window.modoEdicion ? "modificar_correo" : "enviar_correo";
