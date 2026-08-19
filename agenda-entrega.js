@@ -478,10 +478,6 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
         return esCitaDevolucion(c);
     });
 
-    if (isDev && entregasHora.length > 0) {
-        return { disponible: false, razon: "Hay una entrega en esa hora" };
-    }
-
     const agentesLibres = AGENTES.filter((agente) => {
         if (!agenteDisponiblePorReglaHorario(agente, horaSlot)) return false;
 
