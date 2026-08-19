@@ -22,6 +22,202 @@
 window.fechaSeleccionadaParaReserva = null;
 window.horaSeleccionadaParaReserva = null;
 window.datosCocheReserva = null;
+window.citaEdicionId = null;
+
+function normalizarTextoPlano(valor) {
+    return String(valor ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toUpperCase();
+}
+
+function normalizarFechaIso(valor) {
+    if (!valor && valor !== 0) return "";
+
+    if (valor && typeof valor === "object") {
+        if (typeof valor.toDate === "function") {
+            const d = valor.toDate();
+            if (d && !Number.isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const dd = String(d.getDate()).padStart(2, "0");
+                return `${y}-${m}-${dd}`;
+            }
+        }
+        if (typeof valor.seconds === "number") {
+            const d = new Date(valor.seconds * 1000);
+            if (!Number.isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const dd = String(d.getDate()).padStart(2, "0");
+                return `${y}-${m}-${dd}`;
+            }
+        }
+    }
+
+    const txt = String(valor || "").trim();
+    if (!txt) return "";
+
+    const iso = txt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+    const dmy = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmy) {
+        const dd = String(Number(dmy[1])).padStart(2, "0");
+        const mm = String(Number(dmy[2])).padStart(2, "0");
+        return `${dmy[3]}-${mm}-${dd}`;
+    }
+
+    const fechaHora = txt.match(/^(\d{4})-(\d{2})-(\d{2})[T\s].*$/);
+    if (fechaHora) return `${fechaHora[1]}-${fechaHora[2]}-${fechaHora[3]}`;
+
+    const fecha = new Date(txt.replace(" ", "T"));
+    if (!Number.isNaN(fecha.getTime())) {
+        const y = fecha.getFullYear();
+        const m = String(fecha.getMonth() + 1).padStart(2, "0");
+        const dd = String(fecha.getDate()).padStart(2, "0");
+        return `${y}-${m}-${dd}`;
+    }
+
+    return "";
+}
+
+function normalizarHoraHHMM(valor) {
+    if (!valor && valor !== 0) return "";
+
+    const txt = String(valor || "").trim();
+    if (!txt) return "";
+
+    const m = txt.match(/(\d{1,2})\s*[:.]\s*(\d{2})/);
+    if (m) {
+        const h = String(Number(m[1])).padStart(2, "0");
+        const min = String(Number(m[2])).padStart(2, "0");
+        return `${h}:${min}`;
+    }
+
+    const hSimple = txt.match(/(\d{1,2})\s*h?/i);
+    if (hSimple) {
+        const h = String(Number(hSimple[1])).padStart(2, "0");
+        return `${h}:00`;
+    }
+
+    return "";
+}
+
+function obtenerMinutosHora(hora) {
+    const h = normalizarHoraHHMM(hora);
+    if (!h) return Number.NaN;
+    const [horas, mins] = h.split(":");
+    return Number(horas) * 60 + Number(mins);
+}
+
+function normalizarTipoBloqueo(valor) {
+    const txt = normalizarTextoPlano(valor || "");
+    if (["VACACIONES", "DIA_COMPLETO", "DIA COMPLETO", "DIA_LIBRE", "DIA LIBRE", "LIBRE"].includes(txt)) return "dia_completo";
+    if (["HORA_SUELTA", "HORA SUELTA", "HORA", "TRAMO_HORA", "TRAMO HORA"].includes(txt)) return "hora_suelta";
+    return "";
+}
+
+function esBloqueoDiaCompleto(bloqueo) {
+    return normalizarTipoBloqueo(bloqueo?.tipo || bloqueo?.motivo || bloqueo?.tipoBloqueo || "") === "dia_completo";
+}
+
+function bloqueoAfectaFecha(bloqueo, fechaIso) {
+    const tipo = normalizarTipoBloqueo(bloqueo?.tipo || bloqueo?.motivo || bloqueo?.tipoBloqueo || "");
+    if (!tipo) return false;
+
+    const inicio = normalizarFechaIso(bloqueo?.fechaInicio || bloqueo?.fecha || bloqueo?.fechaInicioBloqueo || "");
+    const fin = normalizarFechaIso(bloqueo?.fechaFin || bloqueo?.fechaFinBloqueo || "");
+
+    if (inicio && fin) return fechaIso >= inicio && fechaIso <= fin;
+    if (inicio) return fechaIso === inicio;
+    if (fin) return fechaIso === fin;
+    return false;
+}
+
+function bloqueoAfectaHora(bloqueo, fechaIso, horaSlot, agente = null) {
+    const tipo = normalizarTipoBloqueo(bloqueo?.tipo || bloqueo?.motivo || bloqueo?.tipoBloqueo || "");
+    if (!tipo) return false;
+    if (!bloqueoAfectaFecha(bloqueo, fechaIso)) return false;
+
+    const agenteBloqueado = normalizarTextoPlano(bloqueo?.agente || bloqueo?.operarioAfectado || bloqueo?.operario || "");
+    if (agenteBloqueado && agenteBloqueado !== "AMBOS" && agente !== null && agenteBloqueado !== agente) {
+        return false;
+    }
+    if (agenteBloqueado && agenteBloqueado !== "AMBOS" && agente === null) {
+        return false;
+    }
+
+    const horaSlotNorm = normalizarHoraHHMM(horaSlot);
+
+    if (tipo === "dia_completo") return true;
+    if (tipo !== "hora_suelta") return false;
+
+    if (bloqueo?.hora) {
+        const horaBloqueo = normalizarHoraHHMM(bloqueo.hora);
+        return !!horaBloqueo && horaBloqueo === horaSlotNorm;
+    }
+
+    if (bloqueo?.horaInicio && bloqueo?.horaFin) {
+        const ini = normalizarHoraHHMM(bloqueo.horaInicio);
+        const fin = normalizarHoraHHMM(bloqueo.horaFin);
+        const slotMin = obtenerMinutosHora(horaSlotNorm);
+        const iniMin = obtenerMinutosHora(ini);
+        const finMin = obtenerMinutosHora(fin);
+        return !Number.isNaN(slotMin) && !Number.isNaN(iniMin) && !Number.isNaN(finMin) && slotMin >= iniMin && slotMin <= finMin;
+    }
+
+    return false;
+}
+
+async function cargarDatosDia(fechaIso) {
+    const [citasSnap, bloqueosSnap] = await Promise.all([
+        window.getDocs(window.collection(window.db, "citas_agenda")),
+        window.getDocs(window.collection(window.db, "bloqueos_agenda"))
+    ]);
+
+    const citas = [];
+    citasSnap.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const fechaCita = normalizarFechaIso(
+            data.fecha
+            || data.fechaCita
+            || data.fechaProgramada
+            || data.fechaHora
+            || data.fecha_hora
+            || data.fechaProgramacion
+            || data.fechaProgramadaCita
+            || ""
+        );
+        if (!fechaCita || fechaCita !== fechaIso) return;
+
+        const horaCita = normalizarHoraHHMM(
+            data.hora
+            || data.horaCita
+            || data.horaProgramada
+            || data.hora_programada
+            || data.horaCitaProgramada
+            || data.horaProgramacion
+            || ""
+        );
+        citas.push({
+            id: docSnap.id,
+            ...data,
+            fecha: fechaCita,
+            hora: horaCita || data.hora || ""
+        });
+    });
+
+    const bloqueos = [];
+    bloqueosSnap.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        if (!bloqueoAfectaFecha(data, fechaIso)) return;
+        bloqueos.push({ id: docSnap.id, ...data });
+    });
+
+    return { citas, bloqueos };
+}
 
 window.verificarVehiculoParaCita = async function() {
     const { value: matriculaInput } = await Swal.fire({
@@ -196,8 +392,10 @@ window.abrirModificarCita = async function() {
     const snapshot = await window.getDocs(window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", user.matricula)));
     if(!snapshot.empty) {
         window.datosEdicion = snapshot.docs[0].data();
+        window.citaEdicionId = snapshot.docs[0].id;
     } else {
-        window.datosEdicion = { cliente: user.name, entregaVO: user.entregaVO };
+        window.datosEdicion = { cliente: user.name, entregaVO: user.entregaVO, telefono: user.telefono || '', email: user.email || '' };
+        window.citaEdicionId = null;
     }
 
     let cocheParaReagendar = {
@@ -224,10 +422,19 @@ window.iniciarMotorAgenda = function(cocheData) {
     const contenedorDias = document.getElementById('contenedor-dias-agenda');
     contenedorDias.innerHTML = '';
     
-    let fechaCalculo = new Date(); 
+    let fechaCalculo = new Date();
+    const agendaUrgenteActiva = Boolean(
+        cocheData && (
+            cocheData.agendaClienteUrgente === true ||
+            cocheData.agendaClienteUrgente === 'true' ||
+            cocheData.agendaClienteUrgente === 1 ||
+            cocheData.agendaClienteUrgente === '1'
+        )
+    );
+    const diasMinimosLaborables = agendaUrgenteActiva ? 0 : 2;
     let diasDeMargen = 0;
-    
-    while (diasDeMargen < 2) {
+
+    while (diasDeMargen < diasMinimosLaborables) {
         fechaCalculo.setDate(fechaCalculo.getDate() + 1);
         let diaSemanaMargen = fechaCalculo.getDay();
         if (diaSemanaMargen !== 0 && diaSemanaMargen !== 6) {
@@ -269,24 +476,28 @@ window.mostrarHoras = async function(fechaBBDD, textoDia) {
     gridHoras.innerHTML = `<div style="grid-column: span 2; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size: 24px; color: white;"></i></div>`;
 
     try {
-        const q = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", fechaBBDD));
-        const snapshot = await window.getDocs(q);
-        
-        let conteoHoras = {};
-        snapshot.forEach(doc => { 
-            let horaCita = doc.data().hora;
-            if (!conteoHoras[horaCita]) conteoHoras[horaCita] = 0;
-            conteoHoras[horaCita]++;
-        });
+        const { citas, bloqueos } = await cargarDatosDia(fechaBBDD);
 
         const horasBase = ['10:00', '11:00', '12:00', '13:00', '16:00', '17:00', '18:00', '19:00'];
+        const horasOcupadas = new Set();
+
+        citas.forEach(cita => {
+            const horaCita = normalizarHoraHHMM(cita.hora);
+            if (!horaCita) return;
+            const fechaCita = normalizarFechaIso(cita.fecha || cita.fechaCita || cita.fechaProgramada || "");
+            if (fechaCita && fechaCita !== fechaBBDD) return;
+            horasOcupadas.add(horaCita);
+        });
+
         gridHoras.innerHTML = '';
 
         horasBase.forEach(hora => {
-            let ocupadas = conteoHoras[hora] || 0;
-            let capacidadMaxima = (hora === '19:00') ? 1 : 2;
+            const agentesLibres = ['MANUEL', 'ANTONIO'].filter((agente) => !bloqueos.some((bloqueo) => bloqueoAfectaHora(bloqueo, fechaBBDD, hora, agente)));
+            const bloqueado = agentesLibres.length === 0;
+            const ocupado = horasOcupadas.has(hora);
+            const completo = bloqueado || ocupado;
 
-            if (ocupadas >= capacidadMaxima) {
+            if (completo) {
                 gridHoras.innerHTML += `
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); padding: 15px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: not-allowed;">
                         <i class="fas fa-lock" style="font-size: 12px;"></i> ${hora}
@@ -335,14 +546,17 @@ window.confirmarCitaFirebase = async function(hora) {
         return;
     }
 
+    const usuarioActual = (typeof user !== 'undefined' && user) ? user : {};
+
     let matOficial = window.datosCocheReserva.matricula || window.datosCocheReserva.Matricula || "S/M";
     let modeloCoche = window.datosCocheReserva.modelo || "Vehículo";
     let bastidorCoche = window.datosCocheReserva.bastidor || "S/B";
+    let rentingCoche = window.datosCocheReserva.renting || usuarioActual.renting || "";
     let fechaVisual = window.fechaSeleccionadaParaReserva.split('-').reverse().join('/');
 
     let vNombre = window.modoEdicion && window.datosEdicion ? window.datosEdicion.cliente : (window.datosCocheReserva.cliente || '');
-    let vTlf = window.modoEdicion && window.datosEdicion && window.datosEdicion.telefono ? window.datosEdicion.telefono : '';
-    let vEmail = window.modoEdicion && window.datosEdicion && window.datosEdicion.email ? window.datosEdicion.email : '';
+    let vTlf = window.modoEdicion && window.datosEdicion && window.datosEdicion.telefono ? window.datosEdicion.telefono : (usuarioActual.telefono || '');
+    let vEmail = window.modoEdicion && window.datosEdicion && window.datosEdicion.email ? window.datosEdicion.email : (usuarioActual.email || '');
     let vVO = window.modoEdicion && window.datosEdicion && window.datosEdicion.entregaVO ? window.datosEdicion.entregaVO : 'NO';
     
     let lockStyle = window.modoEdicion ? 'readonly style="opacity:0.6; pointer-events:none;' : 'style="';
@@ -410,62 +624,71 @@ window.confirmarCitaFirebase = async function(hora) {
             Swal.fire({title: 'Procesando tu reserva...', didOpen: () => Swal.showLoading(), allowOutsideClick: false, background: '#001E50', color: '#fff'});
             
             try {
-                const qCheck = window.query(window.collection(window.db, "citas_agenda"), window.where("fecha", "==", window.fechaSeleccionadaParaReserva));
-                const snapCheck = await window.getDocs(qCheck);
-                
-                let ocupadas = 0;
-                let agentesOcupados = [];
-                snapCheck.forEach(doc => {
-                    let data = doc.data();
-                    if (data.hora === window.horaSeleccionadaParaReserva) {
-                        ocupadas++;
-                        if (data.agente) agentesOcupados.push(data.agente);
-                    }
+                await window.ensureFirebaseAuth();
+                const { citas, bloqueos } = await cargarDatosDia(window.fechaSeleccionadaParaReserva);
+                const horaReserva = normalizarHoraHHMM(window.horaSeleccionadaParaReserva);
+                const ocupada = citas.some((cita) => {
+                    const horaCita = normalizarHoraHHMM(cita.hora);
+                    const fechaCita = normalizarFechaIso(cita.fecha || cita.fechaCita || cita.fechaProgramada || "");
+                    return fechaCita === window.fechaSeleccionadaParaReserva && horaCita === horaReserva;
                 });
+                const agentesLibres = ['MANUEL', 'ANTONIO'].filter((agente) => !bloqueos.some((bloqueo) => bloqueoAfectaHora(bloqueo, window.fechaSeleccionadaParaReserva, window.horaSeleccionadaParaReserva, agente)));
+                const bloqueado = agentesLibres.length === 0;
 
-                let capacidadMaxima = (window.horaSeleccionadaParaReserva === '19:00') ? 1 : 2;
-
-                if (ocupadas >= capacidadMaxima) {
-                    Swal.fire('¡Lo sentimos!', 'Esta hora acaba de ser reservada por otro cliente.', 'error');
+                if (ocupada || bloqueado) {
+                    Swal.fire('¡Lo sentimos!', 'Esta hora acaba de estar ocupada o está bloqueada en la agenda.', 'error');
                     window.mostrarHoras(window.fechaSeleccionadaParaReserva, "el día seleccionado");
                     return;
                 }
 
-                let agenteAsignado = "MANUEL";
-                if (window.horaSeleccionadaParaReserva !== '19:00' && ocupadas === 1) {
-                    agenteAsignado = (agentesOcupados[0] === "MANUEL") ? "ANTONIO" : "MANUEL";
-                } else if (ocupadas === 0) {
-                    agenteAsignado = Math.random() < 0.5 ? "MANUEL" : "ANTONIO";
-                }
+                const agenteAsignado = agentesLibres[Math.floor(Math.random() * agentesLibres.length)];
 
-                const qAntigua = window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", matOficial));
-                const snapAntigua = await window.getDocs(qAntigua);
-                for (const docAntiguo of snapAntigua.docs) {
-                    await window.deleteDoc(window.doc(window.db, "citas_agenda", docAntiguo.id));
-                }
-
-                let idCita = new Date().getTime().toString();
-                await window.setDoc(window.doc(window.db, "citas_agenda", idCita), {
+                let idCita = window.citaEdicionId || new Date().getTime().toString();
+                const citaPayload = {
                     fecha: window.fechaSeleccionadaParaReserva,
                     hora: window.horaSeleccionadaParaReserva,
-                    matricula: matOficial,
-                    modelo: modeloCoche,
-                    bastidor: bastidorCoche,
                     cliente: nombre,
                     telefono: telefono,
                     email: email,
-                    entregaVO: vo,
+                    matricula: matOficial,
+                    modelo: modeloCoche,
+                    bastidor: bastidorCoche,
+                    renting: rentingCoche,
+                    entregaVO: 'NO',
                     agente: agenteAsignado,
+                    estado: 'confirmada',
+                    tipoCita: 'SOLO_DEVOLUCION_CLIENTE',
+                    servicioCliente: 'SOLO_DEVOLUCION',
+                    origen: 'CLIENTES_ENTREGA_WEB',
                     creadoEn: new Date().toISOString(),
                     lopdAceptada: true
-                });
+                };
 
-                if (window.datosCocheReserva.id) {
-                    await window.updateDoc(window.doc(window.db, "vehiculos", window.datosCocheReserva.id), {
+                if (window.modoEdicion && window.citaEdicionId) {
+                    await window.updateDoc(window.doc(window.db, "citas_agenda", window.citaEdicionId), citaPayload);
+                } else {
+                    const qAntigua = window.query(window.collection(window.db, "citas_agenda"), window.where("matricula", "==", matOficial));
+                    const snapAntigua = await window.getDocs(qAntigua);
+                    for (const docAntiguo of snapAntigua.docs) {
+                        await window.deleteDoc(window.doc(window.db, "citas_agenda", docAntiguo.id));
+                    }
+                    await window.setDoc(window.doc(window.db, "citas_agenda", idCita), citaPayload);
+                }
+
+                let vehiculoDocId = window.datosCocheReserva.id || null;
+                if (!vehiculoDocId && typeof window.buscarVehiculoEnFirebase === 'function') {
+                    const encontradoVehiculo = await window.buscarVehiculoEnFirebase(matOficial);
+                    vehiculoDocId = encontradoVehiculo && encontradoVehiculo.id ? encontradoVehiculo.id : null;
+                }
+
+                if (vehiculoDocId) {
+                    await window.updateDoc(window.doc(window.db, "vehiculos", vehiculoDocId), {
                         fechaCita: `${fechaVisual} - ${window.horaSeleccionadaParaReserva}h`,
                         agente: agenteAsignado,
                         cliente: nombre,
-                        entregaVO: vo
+                        entregaVO: vo,
+                        renting: rentingCoche,
+                        bastidor: bastidorCoche
                     });
                 }
                 
@@ -474,7 +697,7 @@ window.confirmarCitaFirebase = async function(hora) {
                     try {
                         let accionCorreo = window.modoEdicion ? "modificar_correo" : "enviar_correo";
                         
-                        fetch(API_URL, {
+                        await fetch(API_URL, {
                             method: 'POST',
                             mode: 'no-cors', 
                             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -484,6 +707,8 @@ window.confirmarCitaFirebase = async function(hora) {
                                 cliente: nombre,
                                 modelo: modeloCoche, 
                                 matricula: matOficial,
+                                renting: rentingCoche,
+                                bastidor: bastidorCoche,
                                 fecha: fechaVisual, 
                                 hora: window.horaSeleccionadaParaReserva, 
                                 agente: agenteAsignado
@@ -491,10 +716,14 @@ window.confirmarCitaFirebase = async function(hora) {
                         });
                         
                         window.modoEdicion = false;
+                        window.citaEdicionId = null;
                     } catch(err) {
                         console.error("Error en el bloque de correo:", err);
                     }
                 }
+
+                window.modoEdicion = false;
+                window.citaEdicionId = null;
 
                 Swal.fire({
                     title: '¡CITA RESERVADA!', 
@@ -510,7 +739,9 @@ window.confirmarCitaFirebase = async function(hora) {
                         deliveryDate: `${window.fechaSeleccionadaParaReserva}T${window.horaSeleccionadaParaReserva}:00`,
                         agente: agenteAsignado,
                         entregaVO: vo,
-                        matricula: matOficial
+                        matricula: matOficial,
+                        telefono: telefono,
+                        email: email
                     };
                     localStorage.setItem('vw_user_data', JSON.stringify(user));
                     location.reload();

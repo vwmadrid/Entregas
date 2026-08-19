@@ -36,6 +36,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
         import { getFirestore, collection, getDocs, query, where, updateDoc, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCRfERugbIVfAXtKa7mGdLLTm6xwxb5wlE",
@@ -48,16 +49,30 @@
 
         // Pega aqui tu Site Key de reCAPTCHA v3 desde Firebase App Check
         const RECAPTCHA_V3_SITE_KEY = "6Ld0h0YtAAAAANAXVRTspbV8CZekfIkwB4wOJpi0";
+        const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(location.hostname) || location.protocol === "file:";
+        const shouldEnableAppCheck = !isLocalHost && Boolean(RECAPTCHA_V3_SITE_KEY);
 
         try {
             const app = initializeApp(firebaseConfig);
 
-            initializeAppCheck(app, {
-                provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
-                isTokenAutoRefreshEnabled: true
-            });
+            if (isLocalHost) {
+                console.log("🛠️ App Check desactivado para desarrollo local.");
+            } else if (shouldEnableAppCheck) {
+                try {
+                    initializeAppCheck(app, {
+                        provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
+                        isTokenAutoRefreshEnabled: true
+                    });
+                    console.log("🟢 App Check inicializado correctamente.");
+                } catch (appCheckError) {
+                    console.warn("⚠️ No se pudo inicializar App Check; se continuará sin él.", appCheckError);
+                }
+            } else {
+                console.log("ℹ️ App Check no se inicializa porque no hay configuración activa.");
+            }
 
             window.db = getFirestore(app);
+            window.auth = getAuth(app);
             
             window.collection = collection; 
             window.getDocs = getDocs; 
@@ -68,6 +83,26 @@
             window.deleteDoc = deleteDoc;
             window.onSnapshot = onSnapshot; 
             window.doc = doc;
+            window.signInAnonymously = signInAnonymously;
+
+            window.ensureFirebaseAuth = async function() {
+                if (window.authReadyPromise) return window.authReadyPromise;
+
+                window.authReadyPromise = (async () => {
+                    try {
+                        if (window.auth?.currentUser) return window.auth.currentUser;
+                        const cred = await signInAnonymously(window.auth);
+                        return cred.user;
+                    } catch (authError) {
+                        console.error("🔥 No se pudo autenticar en Firebase:", authError);
+                        throw authError;
+                    }
+                })();
+
+                return window.authReadyPromise;
+            };
+
+            window.ensureFirebaseAuth().catch(() => {});
             
             console.log("🟢 Conexión directa a Firebase establecida correctamente.");
         } catch (error) {
@@ -487,9 +522,132 @@
     </div>
 </div>
 
-<script src="core-cliente.js"></script>
-<script src="agenda-cliente.js"></script>
-<script src="videos-cliente.js"></script>
+<script src="core-cliente.js?v=5"></script>
+<script src="agenda-cliente.js?v=12"></script>
+<script src="videos-cliente.js?v=2"></script>
+<script>
+// ==========================================
+// 📱 SISTEMA DE ONBOARDING E INSTALACIÓN PWA
+// ==========================================
 
+window.promptInstalacionNativo = null;
+window.ONBOARDING_CLIENTES_KEY = 'gescar_onboarding_cliente_v2';
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    window.promptInstalacionNativo = e;
+    if (window.bloquearOnboardingClientes) return;
+    
+    if (!localStorage.getItem(window.ONBOARDING_CLIENTES_KEY)) {
+        setTimeout(() => window.mostrarOnboardingCliente(), 2000);
+    }
+});
+
+window.addEventListener('load', () => {
+    if (window.bloquearOnboardingClientes) return;
+    if (!localStorage.getItem(window.ONBOARDING_CLIENTES_KEY)) {
+        setTimeout(() => {
+            if (!window.promptInstalacionNativo) {
+                window.mostrarOnboardingCliente();
+            }
+        }, 2500);
+    }
+});
+
+window.mostrarOnboardingCliente = function() {
+    let esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    let botonInstalarHtml = esIOS 
+        ? `<div style="margin-top:25px; background-color:#f3f4f6; padding:15px; border-radius:12px; border: 1px dashed #cbd5e1; text-align:center;">
+             <p style="font-size:11px; color:#475569; font-weight:900; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;"><i class="ph-bold ph-apple-logo"></i> Instalación en iPhone / iPad</p>
+             <p style="font-size:12px; color:#64748b; margin:0;">Pulsa <b>'Compartir'</b> <i class="ph-bold ph-export"></i> en el menú de Safari y selecciona <b style="color:#001e50;">'Añadir a la pantalla de inicio'</b> para instalar la App.</p>
+           </div>`
+        : `<button onclick="window.ejecutarInstalacionApp()" style="width:100%; margin-top:25px; background-color:#00b0f0; color:#001e50; font-weight:900; padding:16px; border-radius:12px; box-shadow: 0 8px 20px rgba(0, 176, 240, 0.3); border:none; text-transform:uppercase; letter-spacing:1px; font-size:14px; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition: transform 0.2s;">
+             <i class="ph-bold ph-download-simple" style="font-size:22px;"></i> INSTALAR APP OFICIAL
+           </button>`;
+
+    let botonContinuarHtml = `
+        <div style="text-align: center; margin-top: 15px;">
+            <button onclick="localStorage.setItem(window.ONBOARDING_CLIENTES_KEY, 'true'); Swal.close();" style="background: transparent; border: none; color: #9ca3af; font-size: 12px; font-weight: bold; text-decoration: underline; cursor: pointer;">
+                Continuar vía web
+            </button>
+        </div>
+    `;
+
+    Swal.fire({
+        html: `
+            <!-- Cabecera Corporativa -->
+            <div style="text-align:center; padding-bottom:15px; margin-bottom:20px; border-bottom: 1px solid #e2e8f0;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6d/Volkswagen_logo_2019.svg" style="width:55px; margin: 0 auto 15px auto;">
+                <h2 style="color:#001e50; font-weight:900; font-size:20px; margin:0; text-transform:uppercase; letter-spacing:1px;">Castellana Wagen</h2>
+                <p style="color:#64748b; font-size:12px; font-weight:bold; margin-top:5px; text-transform:uppercase; letter-spacing:2px;">Tu Área de Cliente Digital</p>
+            </div>
+            
+            <!-- Cuerpo y Beneficios -->
+            <div style="text-align:left; font-family:sans-serif;">
+                <p style="font-size:13px; color:#334155; font-weight:600; margin-bottom:20px; text-align:center;">Instala la aplicación gratuita y gestiona todo tu proceso de entrega:</p>
+                
+                <!-- 🔥 NUEVA LISTA ORIGINAL Y LIMPIA CON EMOTICONOS -->
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px;">
+                    <li style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 16px; background: #f1f5f9; padding: 6px; border-radius: 50%; min-width: 32px; text-align: center;">📅</span>
+                        <span style="font-size: 13px; color: #1e293b; font-weight: 600;">Agendar y modificar tu cita</span>
+                    </li>
+                    <li style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 16px; background: #f1f5f9; padding: 6px; border-radius: 50%; min-width: 32px; text-align: center;">⏳</span>
+                        <span style="font-size: 13px; color: #1e293b; font-weight: 600;">Cuenta atrás hasta tu entrega</span>
+                    </li>
+                    <li style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 16px; background: #f1f5f9; padding: 6px; border-radius: 50%; min-width: 32px; text-align: center;">🎬</span>
+                        <span style="font-size: 13px; color: #1e293b; font-weight: 600;">Vídeos explicativos sobre tu vehículo</span>
+                    </li>
+                    <li style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 16px; background: #f1f5f9; padding: 6px; border-radius: 50%; min-width: 32px; text-align: center;">🛍️</span>
+                        <span style="font-size: 13px; color: #1e293b; font-weight: 600;">Catálogo y solicitud de accesorios</span>
+                    </li>
+                    <li style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 16px; background: #f1f5f9; padding: 6px; border-radius: 50%; min-width: 32px; text-align: center;">📞</span>
+                        <span style="font-size: 13px; color: #1e293b; font-weight: 600;">Teléfonos de asistencia directa</span>
+                    </li>
+                    <li style="display: flex; align-items: center; gap: 12px; background: #eff6ff; padding: 8px 12px; border-radius: 12px; border: 1px dashed #bfdbfe; margin-top: 4px;">
+                        <span style="font-size: 18px;">📍</span>
+                        <span style="font-size: 13px; color: #001e50; font-weight: 800;">Aviso de llegada al concesionario</span>
+                    </li>
+                </ul>
+
+                ${botonInstalarHtml}
+                ${botonContinuarHtml}
+            </div>
+        `,
+        showConfirmButton: false, 
+        customClass: {
+            popup: '!rounded-3xl'
+        },
+        allowOutsideClick: false
+    });
+};
+
+// 🔥 FUNCIÓN RECUPERADA PARA GESTIONAR LA INSTALACIÓN
+window.ejecutarInstalacionApp = async function() {
+    if (window.promptInstalacionNativo) {
+        window.promptInstalacionNativo.prompt();
+        const { outcome } = await window.promptInstalacionNativo.userChoice;
+        
+        if (outcome === 'accepted') {
+            Swal.close();
+            localStorage.setItem(window.ONBOARDING_CLIENTES_KEY, 'true');
+        }
+        window.promptInstalacionNativo = null;
+    } else {
+        Swal.fire({
+            icon: 'info',
+            title: 'Instalación Manual',
+            text: 'Tu navegador no permite la instalación automática o la App ya está instalada. Para hacerlo manualmente: abre el menú del navegador (los 3 puntitos) y selecciona "Añadir a la pantalla de inicio" o "Instalar Aplicación".',
+            confirmButtonColor: '#001e50',
+            confirmButtonText: 'Entendido'
+        });
+    }
+};
+</script>
 </body>
 </html>

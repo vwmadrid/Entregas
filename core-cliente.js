@@ -67,14 +67,49 @@ window.alertaEnviada = false;
 let unsubscribeVehiculo = null;
 let unsubscribeCita = null;
 window.tInt = null;
+window.bloquearOnboardingClientes = true;
 
-// 4. INICIALIZACIÓN DE LA APP
-window.onload = function() {
-    setTimeout(() => { 
-        const splash = document.getElementById('s-splash');
-        if (splash) splash.style.display = 'none'; 
-    }, 2000);
+window.mostrarSelectorFlujoClientes = async function() {
+    const { value } = await Swal.fire({
+        title: '¿Qué necesitas hoy?',
+        html: `
+            <p style="font-size:13px; opacity:0.9; margin-bottom:14px;">Selecciona una opción:</p>
+            <div style="text-align:left; display:flex; flex-direction:column; gap:10px;">
+                <label style="display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:14px; padding:14px; cursor:pointer;">
+                    <input type="radio" name="flujoCliente" value="recoger" style="width:20px; height:20px; accent-color:#00B0F0;">
+                    <span style="font-size:18px; font-weight:800; color:#fff; line-height:1.2;">Recoger un vehículo</span>
+                </label>
+                <label style="display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:14px; padding:14px; cursor:pointer;">
+                    <input type="radio" name="flujoCliente" value="devolver" style="width:20px; height:20px; accent-color:#00B0F0;">
+                    <span style="font-size:18px; font-weight:800; color:#fff; line-height:1.2;">Devolver un vehículo</span>
+                </label>
+                <label style="display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:14px; padding:14px; cursor:pointer;">
+                    <input type="radio" name="flujoCliente" value="ambos" style="width:20px; height:20px; accent-color:#00B0F0;">
+                    <span style="font-size:18px; font-weight:800; color:#fff; line-height:1.2;">Ambos</span>
+                </label>
+            </div>
+        `,
+        background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+        color: '#fff',
+        heightAuto: false,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        confirmButtonText: 'Continuar',
+        confirmButtonColor: '#00B0F0',
+        preConfirm: () => {
+            const picked = document.querySelector('input[name="flujoCliente"]:checked');
+            if (!picked) {
+                Swal.showValidationMessage('Selecciona una opción para continuar.');
+                return false;
+            }
+            return picked.value;
+        }
+    });
 
+    return value || null;
+};
+
+window.arrancarClientesTrasSelector = async function() {
     if (modoPruebaActivado) {
         document.getElementById('panel-pruebas').style.display = 'block';
         if(typeof window.cargarModeloPrueba === 'function') window.cargarModeloPrueba();
@@ -92,7 +127,7 @@ window.onload = function() {
         .then(snapshot => {
             if (!snapshot.empty) {
                 let docData = snapshot.docs[0].data();
-                window.datosEdicion = docData; 
+                window.datosEdicion = docData;
 
                 let cocheParaReagendar = {
                     matricula: docData.matricula,
@@ -109,8 +144,8 @@ window.onload = function() {
                     title: 'MODIFICAR CITA',
                     text: 'Tus datos están guardados de forma segura. Selecciona tu nuevo día y hora de entrega.',
                     icon: 'info',
-                    background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)', 
-                    color: '#fff', 
+                    background: 'linear-gradient(145deg, #001E50 0%, #000510 100%)',
+                    color: '#fff',
                     confirmButtonColor: '#00b0f0'
                 });
             } else {
@@ -122,6 +157,40 @@ window.onload = function() {
     }
 
     window.verificarSesionLocal();
+};
+
+window.intentarMostrarOnboardingClientes = function() {
+    try {
+        if (window.bloquearOnboardingClientes) return;
+        if (!window.ONBOARDING_CLIENTES_KEY) return;
+        if (localStorage.getItem(window.ONBOARDING_CLIENTES_KEY)) return;
+        if (typeof window.mostrarOnboardingCliente !== 'function') return;
+
+        // Si existe prompt nativo pendiente, dejamos que la UI de onboarding lo consuma.
+        setTimeout(() => window.mostrarOnboardingCliente(), 600);
+    } catch (e) {
+        console.warn('No se pudo lanzar onboarding de clientes tras selector.', e);
+    }
+};
+
+// 4. INICIALIZACIÓN DE LA APP
+window.onload = async function() {
+    setTimeout(() => { 
+        const splash = document.getElementById('s-splash');
+        if (splash) splash.style.display = 'none'; 
+    }, 2000);
+
+    const flujo = await window.mostrarSelectorFlujoClientes();
+    if (!flujo) return;
+
+    if (flujo === 'devolver') {
+        window.location.href = 'agenda-entrega.html';
+        return;
+    }
+
+    window.bloquearOnboardingClientes = false;
+    window.intentarMostrarOnboardingClientes();
+    await window.arrancarClientesTrasSelector();
 };
 
 window.verificarSesionLocal = async function() {
@@ -258,12 +327,49 @@ window.loadDash = function() {
 };
 
 // 5. FUNCIONES DE BASE DE DATOS Y SINCRONIZACIÓN
+window.buscarDocumentosVehiculoPorIdentificador = async function(identificador) {
+    const mat = String(identificador || '').toUpperCase().replace(/\s/g, '');
+    if (!mat || mat.length < 3 || !window.db) return [];
+
+    let matConEspacio = mat;
+    if (/^\d{4}[A-Z]{3}$/.test(mat)) {
+        matConEspacio = mat.substring(0, 4) + ' ' + mat.substring(4);
+    }
+
+    const vehRef = window.collection(window.db, "vehiculos");
+    const busquedas = [
+        window.getDocs(window.query(vehRef, window.where("matricula", "==", mat))),
+        window.getDocs(window.query(vehRef, window.where("Matricula", "==", mat))),
+        window.getDocs(window.query(vehRef, window.where("bastidor", "==", mat)))
+    ];
+
+    if (matConEspacio !== mat) {
+        busquedas.push(window.getDocs(window.query(vehRef, window.where("matricula", "==", matConEspacio))));
+        busquedas.push(window.getDocs(window.query(vehRef, window.where("Matricula", "==", matConEspacio))));
+    }
+
+    const resultados = await Promise.all(busquedas);
+    const encontrados = [];
+    const idsVistos = new Set();
+
+    resultados.forEach((querySnapshot) => {
+        querySnapshot.forEach((docSnap) => {
+            if (idsVistos.has(docSnap.id)) return;
+            idsVistos.add(docSnap.id);
+            encontrados.push({ id: docSnap.id, data: docSnap.data() });
+        });
+    });
+
+    return encontrados;
+};
+
 window.buscarVehiculoEnFirebase = async function(identificador) {
-    const mat = String(identificador).toUpperCase().replace(/\s/g, '');
-    const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
+    const encontrados = await window.buscarDocumentosVehiculoPorIdentificador(identificador);
     let resultado = null;
-    querySnapshot.forEach((docSnap) => {
-        const c = docSnap.data();
+
+    encontrados.forEach((docSnap) => {
+        const c = docSnap.data;
+        const mat = String(identificador).toUpperCase().replace(/\s/g, '');
         const matDB = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
         const basDB = (c.bastidor || "").toUpperCase();
         if (matDB === mat || basDB === mat) {
@@ -319,14 +425,25 @@ window.buildUserFromVehiculo = function(cocheF, matriculaFallback, previousUser)
         || (previousUser && previousUser.car)
         || cars[0];
     const matricula = cocheF.matricula || cocheF.Matricula || matriculaFallback;
+    const renting = cocheF.renting || cocheF.agencia || (previousUser && previousUser.renting) || "";
+    const bastidor = cocheF.bastidor || (previousUser && previousUser.bastidor) || "";
+    const agendaClienteUrgente = Boolean(
+        cocheF.agendaClienteUrgente === true ||
+        cocheF.agendaClienteUrgente === 'true' ||
+        cocheF.agendaClienteUrgente === 1 ||
+        cocheF.agendaClienteUrgente === '1'
+    );
     return {
         name: cocheF.cliente || (previousUser && previousUser.name) || "Cliente",
-        car: car,
+        car: { ...car, renting: renting, bastidor: bastidor, modeloCompleto: cocheF.modelo || car.name },
         deliveryDate: window.parseFechaCita(cocheF.fechaCita),
         agente: cocheF.agente || (previousUser && previousUser.agente) || "MANUEL",
         entregaVO: cocheF.entregaVO || (previousUser && previousUser.entregaVO) || "NO",
         matricula: matricula,
-        entregado: cocheF.entregado === true || cocheF.entregado === "true"
+        renting: renting,
+        bastidor: bastidor,
+        entregado: cocheF.entregado === true || cocheF.entregado === "true",
+        agendaClienteUrgente: agendaClienteUrgente
     };
 };
 
@@ -561,13 +678,13 @@ window.notifyArrival = async function() {
         let matriculaLimpia = mat.toUpperCase().replace(/\s/g, '');
         let docIdEncontrado = null;
 
-        const querySnapshot = await window.getDocs(window.collection(window.db, "vehiculos"));
-        querySnapshot.forEach((doc) => {
-            const c = doc.data();
+        const encontrados = await window.buscarDocumentosVehiculoPorIdentificador(matriculaLimpia);
+        encontrados.forEach((docSnap) => {
+            const c = docSnap.data;
             const matDB = (c.matricula || c.Matricula || "").toUpperCase().replace(/\s/g, '');
             const basDB = (c.bastidor || "").toUpperCase();
             if (matDB === matriculaLimpia || basDB === matriculaLimpia) {
-                docIdEncontrado = doc.id;
+                docIdEncontrado = docSnap.id;
             }
         });
         

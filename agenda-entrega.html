@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Castellana Wagen | Reserva entrega de vehiculo</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --bg-1: #03122f;
+            --bg-2: #001e50;
+            --line: rgba(255, 255, 255, 0.18);
+            --text: #e6eef8;
+            --muted: #9db4cf;
+            --brand: #00b0f0;
+            --ok: #16a34a;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at top right, #10366f 0%, var(--bg-2) 38%, var(--bg-1) 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            width: min(980px, 92vw);
+            margin: 26px auto 60px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            padding: 22px;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        .title {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.15;
+            letter-spacing: 0.4px;
+        }
+
+        .sub {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .field input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 12px;
+            padding: 12px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-weight: 800;
+            letter-spacing: 0.9px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        .btn:hover { transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-main {
+            background: linear-gradient(135deg, var(--brand), #4bc4f3);
+            color: #052351;
+        }
+
+        .btn-hour {
+            background: rgba(0, 176, 240, 0.14);
+            border: 1px solid rgba(0, 176, 240, 0.45);
+            color: #bcecff;
+        }
+
+        .btn-hour.selected {
+            background: var(--brand);
+            color: #032040;
+            border-color: var(--brand);
+        }
+
+        .btn-hour.locked {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.45);
+            cursor: not-allowed;
+        }
+
+        .days {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .day {
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.05);
+            color: #dcecff;
+            padding: 10px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .day strong {
+            display: block;
+            font-size: 24px;
+            line-height: 1;
+            margin-top: 4px;
+        }
+
+        .day.selected {
+            border-color: var(--brand);
+            background: rgba(0, 176, 240, 0.2);
+        }
+
+        .hours {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .status {
+            margin-top: 14px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .topbar {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            background: rgba(22, 163, 74, 0.14);
+            border: 1px solid rgba(22, 163, 74, 0.4);
+            color: #b8f5cb;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 11px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        @media (max-width: 820px) {
+            .grid { grid-template-columns: 1fr; }
+            .hours { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .title { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="card">
+            <div class="topbar">
+                <div>
+                    <h1 class="title">Agenda de entrega de vehiculo</h1>
+                    <p class="sub">Acceso web rapido para reservar cita. No requiere instalar ninguna app.</p>
+                </div>
+                <span class="chip">Reserva directa</span>
+            </div>
+
+            <div class="grid">
+                <div class="field">
+                    <label for="cliente-nombre">Nombre y apellidos</label>
+                    <input id="cliente-nombre" autocomplete="name" placeholder="Ej: Maria Garcia Lopez">
+                </div>
+                <div class="field">
+                    <label for="cliente-email">Email de confirmacion</label>
+                    <input id="cliente-email" type="email" autocomplete="email" placeholder="cliente@correo.com">
+                </div>
+                <div class="field">
+                    <label for="cliente-telefono">Telefono</label>
+                    <input id="cliente-telefono" type="tel" autocomplete="tel" placeholder="Ej: 600123123">
+                </div>
+                <div class="field">
+                    <label for="cliente-matricula">Matricula del vehiculo a entregar</label>
+                    <input id="cliente-matricula" style="text-transform:uppercase" placeholder="1234ABC">
+                </div>
+            </div>
+
+            <p class="status" id="agenda-status">Selecciona una fecha para ver los huecos disponibles.</p>
+            <div class="days" id="days-grid"></div>
+            <div class="hours" id="hours-grid"></div>
+
+            <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+                <button id="btn-reservar" class="btn btn-main" disabled>Confirmar cita</button>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="agenda-entrega.js?v=14"></script>
+</body>
+</html>

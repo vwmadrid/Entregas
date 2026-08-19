@@ -1,0 +1,24 @@
+{
+  "name": "clientes",
+  "version": "1.0.0",
+  "description": "**Desarrollado por:** M2 Code Systems (Manuel Arjona Carrera y Miriam Olmo Fernández)\r **Versión:** 1.0.0\r **Año:** 2026",
+  "main": "agenda-cliente.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vwmadrid/Entregas.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/vwmadrid/Entregas/issues"
+  },
+  "homepage": "https://github.com/vwmadrid/Entregas#readme",
+  "dependencies": {
+    "firebase": "^10.12.2"
+  }
+}
