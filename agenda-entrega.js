@@ -22,6 +22,11 @@ const ESTADO = {
     hora: ""
 };
 
+let diasDisponibles = new Map();
+let mesActual = { year: 0, month: 0 };
+let mesMin = { year: 0, month: 0 };
+let mesMax = { year: 0, month: 0 };
+
 let db;
 
 function esHostLocal() {
@@ -545,25 +550,95 @@ function esSlotPasado(fechaIso, horaSlot) {
 }
 
 function renderDias() {
-    const container = document.getElementById("days-grid");
-    if (!container) return;
-
     const dias = obtenerDiasLaborables(21, 0);
-    container.innerHTML = dias.map((d) => `
-        <button class="day" data-fecha="${d.iso}" type="button">
-            <span>${escapeHtml(d.shortWeek)}</span>
-            <strong>${escapeHtml(d.dayNum)}</strong>
-        </button>
-    `).join("");
+    diasDisponibles = new Map(dias.map(d => [d.iso, d]));
+    if (dias.length === 0) return;
 
-    container.querySelectorAll(".day").forEach((btn) => {
+    const [y0, m0] = dias[0].iso.split("-").map(Number);
+    const [yN, mN] = dias[dias.length - 1].iso.split("-").map(Number);
+    mesMin = { year: y0, month: m0 - 1 };
+    mesMax = { year: yN, month: mN - 1 };
+    mesActual = { ...mesMin };
+
+    const btnPrev = document.getElementById("btn-prev-mes");
+    const btnNext = document.getElementById("btn-next-mes");
+
+    if (btnPrev) btnPrev.addEventListener("click", () => {
+        const prev = new Date(mesActual.year, mesActual.month - 1, 1);
+        mesActual = { year: prev.getFullYear(), month: prev.getMonth() };
+        renderCalendario();
+    });
+    if (btnNext) btnNext.addEventListener("click", () => {
+        const next = new Date(mesActual.year, mesActual.month + 1, 1);
+        mesActual = { year: next.getFullYear(), month: next.getMonth() };
+        renderCalendario();
+    });
+
+    renderCalendario();
+}
+
+function renderCalendario() {
+    const grid = document.getElementById("days-grid");
+    const label = document.getElementById("cal-mes-label");
+    const btnPrev = document.getElementById("btn-prev-mes");
+    const btnNext = document.getElementById("btn-next-mes");
+    if (!grid) return;
+
+    const { year, month } = mesActual;
+
+    if (label) {
+        label.textContent = new Date(year, month, 1)
+            .toLocaleDateString("es-ES", { month: "long", year: "numeric" })
+            .replace(/^./, c => c.toUpperCase());
+    }
+
+    if (btnPrev) btnPrev.disabled = year === mesMin.year && month === mesMin.month;
+    if (btnNext) btnNext.disabled = year === mesMax.year && month === mesMax.month;
+
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const firstDow = new Date(year, month, 1).getDay(); // 0=Dom,1=Lun,...,6=Sab
+
+    const cells = [];
+    // empty cells before first day (Mon-Fri offset)
+    const offset = firstDow === 0 ? 4 : Math.max(0, firstDow - 1);
+    for (let i = 0; i < offset; i++) cells.push({ type: "empty" });
+
+    for (let d = 1; d <= lastDay; d++) {
+        const dow = new Date(year, month, d).getDay();
+        if (dow === 0 || dow === 6) continue;
+        const mm = String(month + 1).padStart(2, "0");
+        const dd = String(d).padStart(2, "0");
+        const iso = `${year}-${mm}-${dd}`;
+        cells.push({ type: "day", d, iso, isAvail: diasDisponibles.has(iso) });
+    }
+
+    let html = ["L", "M", "X", "J", "V"]
+        .map(h => `<div class="cal-head">${h}</div>`).join("");
+
+    cells.forEach(cell => {
+        if (cell.type === "empty") {
+            html += `<div class="cal-day empty"></div>`;
+        } else if (cell.isAvail) {
+            const sel = ESTADO.fechaIso === cell.iso ? " selected" : "";
+            html += `<button type="button" class="cal-day disponible${sel}" data-fecha="${cell.iso}">${cell.d}</button>`;
+        } else {
+            html += `<div class="cal-day no-disponible">${cell.d}</div>`;
+        }
+    });
+
+    grid.innerHTML = html;
+
+    grid.querySelectorAll(".cal-day.disponible").forEach(btn => {
         btn.addEventListener("click", async () => {
             ESTADO.fechaIso = btn.getAttribute("data-fecha") || "";
             ESTADO.fechaLabel = fechaVisualDesdeIso(ESTADO.fechaIso);
             ESTADO.hora = "";
 
-            container.querySelectorAll(".day").forEach((x) => x.classList.remove("selected"));
+            grid.querySelectorAll(".cal-day").forEach(x => x.classList.remove("selected"));
             btn.classList.add("selected");
+
+            const ph = document.getElementById("hours-placeholder");
+            if (ph) ph.style.display = "none";
 
             await renderHoras();
             actualizarBotonReserva();
@@ -573,11 +648,18 @@ function renderDias() {
 
 async function renderHoras() {
     const grid = document.getElementById("hours-grid");
+    const header = document.getElementById("hours-panel-header");
     if (!grid) return;
 
     if (!ESTADO.fechaIso) {
         grid.innerHTML = "";
+        if (header) header.style.display = "none";
         return;
+    }
+
+    if (header) {
+        header.textContent = `Horas disponibles · ${ESTADO.fechaLabel}`;
+        header.style.display = "block";
     }
 
     actualizarEstado("Cargando huecos disponibles...");
