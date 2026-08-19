@@ -500,9 +500,6 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
     });
 
     if (isDev) {
-        if (devolucionesExactas.length >= 1) {
-            return { disponible: false, razon: "Hueco de devolucion ocupado" };
-        }
         if (agentesLibres.length === 0) {
             return { disponible: false, razon: "Bloqueado por agenda" };
         }
