@@ -421,11 +421,15 @@ function mismaHoraBase(h1, h2) {
     return horaRaiz(h1) === horaRaiz(h2);
 }
 
+// ==========================================
+// 🧠 LÓGICA MATEMÁTICA DE OCUPACIÓN (ENTREGAS VS DEVOLUCIONES)
+// ==========================================
 function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
     const isDev = esSoloDevolucion();
     const horaSlotNorm = normalizarHoraHHMM(horaSlot);
-    const horaBase = horaRaiz(horaSlotNorm);
+    const horaBase = horaRaiz(horaSlotNorm); // Extrae la hora en punto (ej. de 10:30 saca 10:00)
 
+    // 1. Comprobamos bloqueos manuales globales (vacaciones / hora suelta para AMBOS)
     const bloqueoGlobalFranja = (Array.isArray(bloqueos) ? bloqueos : []).some((b) => {
         const agenteAfectado = normalizarTextoPlano(b.operarioAfectado || b.agente || "AMBOS");
         const esGlobal = !agenteAfectado || agenteAfectado.includes("AMBOS");
@@ -446,7 +450,6 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
             const iniNorm = normalizarHoraHHMM(b.horaInicio);
             const finNorm = normalizarHoraHHMM(b.horaFin);
             if (!iniNorm || !finNorm) return false;
-
             if (iniNorm === finNorm && iniNorm.endsWith(":00") && mismaHoraBase(iniNorm, horaSlotNorm)) return true;
 
             const slot = obtenerMinutosHora(horaSlotNorm);
@@ -455,7 +458,6 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
             if (Number.isNaN(slot) || Number.isNaN(ini) || Number.isNaN(fin)) return false;
             return slot >= ini && slot <= fin;
         }
-
         return false;
     });
 
@@ -463,48 +465,66 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
         return { disponible: false, razon: "Bloqueo manual global" };
     }
 
+    // 2. Filtramos las citas que afectan a este hueco
+    // Las entregas ocupan toda la hora base completa (bloquean el :00 y el :30)
     const entregasHora = citas.filter((c) => {
         if (!c) return false;
+        if (c.esConjunta === true || c.esConjunta === "true") return false; // Ignoramos conjuntas forzadas
         const horaCitaNorm = normalizarHoraHHMM(c.hora || "");
         if (!horaCitaNorm) return false;
         if (horaRaiz(horaCitaNorm) !== horaBase) return false;
         return !esCitaDevolucion(c);
     });
 
+    // Las devoluciones solo ocupan su bloque exacto de 30 mins (ej. 10:30)
     const devolucionesExactas = citas.filter((c) => {
         if (!c) return false;
+        if (c.esConjunta === true || c.esConjunta === "true") return false;
         const horaCitaNorm = normalizarHoraHHMM(c.hora || "");
         if (horaCitaNorm !== horaSlotNorm) return false;
         return esCitaDevolucion(c);
     });
 
-    const agentesLibres = AGENTES.filter((agente) => {
-        if (!agenteDisponiblePorReglaHorario(agente, horaSlot)) return false;
+    // 3. Contabilizamos las sillas ocupadas por agente
+    let ocupManuel = 0;
+    let ocupAntonio = 0;
+    let ocupSinAsignar = 0;
 
-        const bloqueado = bloqueos.some((b) => estaBloqueadoAgenteEnSlot(b, agente, fechaIso, horaSlot));
-        if (bloqueado) return false;
+    const sumarOcupacion = (cita) => {
+        const ag = normalizarTextoPlano(cita.agente || cita.entregador || "");
+        if (ag === "MANUEL") ocupManuel++;
+        else if (ag === "ANTONIO") ocupAntonio++;
+        else ocupSinAsignar++;
+    };
 
-        const ocupadoPorEntrega = entregasHora.some((c) => normalizarTextoPlano(c.agente || "") === normalizarTextoPlano(agente));
-        if (ocupadoPorEntrega) return false;
+    entregasHora.forEach(sumarOcupacion);
+    devolucionesExactas.forEach(sumarOcupacion);
 
-        if (isDev) {
-            const ocupadoPorDevolucion = devolucionesExactas.some((c) => normalizarTextoPlano(c.agente || "") === normalizarTextoPlano(agente));
-            if (ocupadoPorDevolucion) return false;
-        }
+    // 4. Comprobamos si alguno tiene el día libre u horas sueltas bloqueadas
+    let mBloqueado = bloqueos.some((b) => estaBloqueadoAgenteEnSlot(b, "MANUEL", fechaIso, horaSlot));
+    let aBloqueado = bloqueos.some((b) => estaBloqueadoAgenteEnSlot(b, "ANTONIO", fechaIso, horaSlot));
 
-        return true;
-    });
+    // 5. Calculamos la capacidad real (1 silla por agente, o 0 si está bloqueado/ocupado)
+    let huecosManuel = mBloqueado ? 0 : Math.max(0, 1 - ocupManuel);
+    let huecosAntonio = aBloqueado ? 0 : Math.max(0, 1 - ocupAntonio);
 
-    if (isDev) {
-        if (agentesLibres.length === 0) {
-            return { disponible: false, razon: "Bloqueado por agenda" };
-        }
-        return { disponible: true, agentesLibres };
+    // Regla especial: Antonio no entrega pasadas las 19:00
+    if (!agenteDisponiblePorReglaHorario("ANTONIO", horaSlot)) {
+        huecosAntonio = 0;
     }
 
-    if (agentesLibres.length === 0) {
-        return { disponible: false, razon: "Bloqueado por agenda" };
+    // 6. Restamos las citas sin agente asignado a las sillas totales
+    let huecosTotales = huecosManuel + huecosAntonio - ocupSinAsignar;
+
+    // Si ya no quedan sillas para nadie, bloqueamos el botón
+    if (huecosTotales <= 0) {
+        return { disponible: false, razon: "Agentes ocupados (entregas de 1h o devoluciones)" };
     }
+
+    // 7. Si hay huecos, determinamos quién está libre para que el código le asigne la cita
+    let agentesLibres = [];
+    if (huecosManuel > 0) agentesLibres.push("MANUEL");
+    if (huecosAntonio > 0) agentesLibres.push("ANTONIO");
 
     return { disponible: true, agentesLibres };
 }
@@ -733,7 +753,9 @@ async function reservar() {
     const btn = document.getElementById("btn-reservar");
     if (btn) btn.disabled = true;
 
-    await Swal.fire({ title: "Guardando cita...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    // 🔥 EL ARREGLO ESTÁ AQUÍ: Hemos quitado el 'await' para que el código no se detenga.
+    // Lanza la alerta visual y sigue trabajando en segundo plano inmediatamente.
+    Swal.fire({ title: "Guardando cita...", allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     try {
         const { citas, bloqueos } = await cargarDatosDia(ESTADO.fechaIso);
@@ -785,6 +807,7 @@ async function reservar() {
             agente: agenteAsignado
         });
 
+        // Este await sí es correcto, porque queremos esperar a que el usuario lea que todo ha ido bien
         await Swal.fire({
             icon: "success",
             title: "Cita confirmada",
