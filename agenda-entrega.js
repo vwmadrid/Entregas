@@ -504,10 +504,6 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
         return { disponible: true, agentesLibres };
     }
 
-    // Recogida de coche nuevo: 1 coche por hora en total.
-    if (entregasHora.length >= 1) {
-        return { disponible: false, razon: "Hora ocupada por otra entrega" };
-    }
     if (agentesLibres.length === 0) {
         return { disponible: false, razon: "Bloqueado por agenda" };
     }
