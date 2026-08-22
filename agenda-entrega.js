@@ -424,6 +424,9 @@ function mismaHoraBase(h1, h2) {
 // ==========================================
 // 🧠 LÓGICA MATEMÁTICA DE OCUPACIÓN (ENTREGAS VS DEVOLUCIONES)
 // ==========================================
+// ==========================================
+// 🧠 LÓGICA MATEMÁTICA DE OCUPACIÓN (ENTREGAS VS DEVOLUCIONES)
+// ==========================================
 function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
     const isDev = esSoloDevolucion();
     const horaSlotNorm = normalizarHoraHHMM(horaSlot);
@@ -466,20 +469,17 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
     }
 
     // 2. Filtramos las citas que afectan a este hueco
-    // Las entregas ocupan toda la hora base completa (bloquean el :00 y el :30)
+    // 🔥 ARREGLO: Eliminada la excepción de "esConjunta". Si hay una entrega, bloquea la hora completa.
     const entregasHora = citas.filter((c) => {
         if (!c) return false;
-        if (c.esConjunta === true || c.esConjunta === "true") return false; // Ignoramos conjuntas forzadas
         const horaCitaNorm = normalizarHoraHHMM(c.hora || "");
         if (!horaCitaNorm) return false;
         if (horaRaiz(horaCitaNorm) !== horaBase) return false;
         return !esCitaDevolucion(c);
     });
 
-    // Las devoluciones solo ocupan su bloque exacto de 30 mins (ej. 10:30)
     const devolucionesExactas = citas.filter((c) => {
         if (!c) return false;
-        if (c.esConjunta === true || c.esConjunta === "true") return false;
         const horaCitaNorm = normalizarHoraHHMM(c.hora || "");
         if (horaCitaNorm !== horaSlotNorm) return false;
         return esCitaDevolucion(c);
@@ -491,9 +491,10 @@ function obtenerDisponibilidadSlot(citas, bloqueos, fechaIso, horaSlot) {
     let ocupSinAsignar = 0;
 
     const sumarOcupacion = (cita) => {
+        // 🔥 ARREGLO: Usamos .includes() para evitar fallos si el nombre contiene apellidos
         const ag = normalizarTextoPlano(cita.agente || cita.entregador || "");
-        if (ag === "MANUEL") ocupManuel++;
-        else if (ag === "ANTONIO") ocupAntonio++;
+        if (ag.includes("MANUEL")) ocupManuel++;
+        else if (ag.includes("ANTONIO")) ocupAntonio++;
         else ocupSinAsignar++;
     };
 
